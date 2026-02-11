@@ -2,7 +2,7 @@
 
 <img width="1310" height="914" alt="Captura de Tela 2026-02-11 às 8 02 55 AM" src="https://github.com/user-attachments/assets/8dc6caa6-8e4f-4850-8aa5-911165e4a255" />
 
-Um gerador de QR Codes minimalista, seguro e estático, com design inspirado na interface do iOS/macOS. Desenvolvido para ser rápido, responsivo e funcionar inteiramente no navegador.
+Um gerador de QR Codes minimalista, seguro e estático. Desenvolvido para ser rápido, responsivo e funcionar inteiramente no navegador.
 
 🔗 **Acesse o projeto online:** [https://mateusfrmacedo.github.io/](https://mateusfrmacedo.github.io/)
 
@@ -41,5 +41,3 @@ Este projeto utiliza uma abordagem **estática**. Não há backend (banco de dad
 ---
 
 Projeto desenvolvido com foco em UI/UX e simplicidade.
-
-[Visite meu GitHub](https://github.com/mateusfrmacedo)
