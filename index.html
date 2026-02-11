@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>QR Code Generator</title>
+    <style>
+        /* 1. RESET E FONTE APPLE (SF PRO) */
+        * {
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        /* 2. CARD ESTILO IOS */
+        .apple-card {
+            background-color: #ffffff;
+            width: 90%;
+            max-width: 360px;
+            padding: 40px 30px;
+            border-radius: 22px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+            letter-spacing: -0.5px;
+        }
+
+        p {
+            font-size: 15px;
+            color: #86868b;
+            margin: 0 0 30px 0;
+            line-height: 1.4;
+        }
+
+        /* 3. INPUTS E BOTÕES */
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        input {
+            width: 100%;
+            padding: 16px;
+            font-size: 17px;
+            border: 1px solid #d2d2d7;
+            border-radius: 12px;
+            background-color: #fafafa;
+            color: #1d1d1f;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        input:focus {
+            border-color: #0071e3;
+            background-color: #fff;
+            box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15);
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 16px;
+            font-size: 17px;
+            font-weight: 500;
+            color: white;
+            background-color: #0071e3;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s;
+        }
+
+        .btn-primary:hover {
+            background-color: #0077ED;
+        }
+
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+
+        /* Botão Secundário (Link de download) */
+        .btn-secondary {
+            display: none;
+            margin-top: 15px;
+            font-size: 15px;
+            font-weight: 500;
+            color: #0071e3;
+            background: none;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            padding: 10px;
+        }
+        
+        .btn-secondary:hover {
+            text-decoration: underline;
+        }
+
+        /* 4. ÁREA DO QR CODE */
+        #qrcode-container {
+            margin-top: 30px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #qrcode img, #qrcode canvas {
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 5. RODAPÉ PERSONALIZADO (FIXED) */
+        footer {
+            margin-top: 40px;
+            font-size: 13px;
+            color: #86868b;
+            font-weight: 400;
+        }
+
+        footer a {
+            color: #86868b;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+
+        footer a:hover {
+            color: #0071e3;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+    <div class="apple-card">
+        <h1>Criar QR Code</h1>
+        <p>Digite seu link ou texto abaixo para gerar um código instantaneamente.</p>
+
+        <div class="input-group">
+            <input type="text" id="linkInput" placeholder="https://exemplo.com" />
+        </div>
+        
+        <button class="btn-primary" onclick="gerarQR()">Gerar</button>
+
+        <div id="qrcode-container">
+            <div id="qrcode"></div>
+        </div>
+
+        <button id="downloadBtn" class="btn-secondary" onclick="baixarQR()">Baixar Imagem</button>
+    </div>
+
+    <footer>
+        Created by <a href="https://mateusfrmacedo.github.io/" target="_blank">Mateus</a>
+    </footer>
+
+    <script>
+        var qrcodeObj = null;
+
+        function gerarQR() {
+            var inputUsuario = document.getElementById("linkInput").value;
+            var container = document.getElementById("qrcode-container");
+            var qrDiv = document.getElementById("qrcode");
+            var downloadBtn = document.getElementById("downloadBtn");
+
+            if (inputUsuario.trim() === "") {
+                var input = document.getElementById("linkInput");
+                input.style.borderColor = "#ff3b30";
+                setTimeout(() => { input.style.borderColor = "#d2d2d7"; }, 2000);
+                return;
+            }
+
+            qrDiv.innerHTML = "";
+            container.style.display = "flex";
+
+            qrcodeObj = new QRCode(qrDiv, {
+                text: inputUsuario,
+                width: 200,
+                height: 200,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+
+            setTimeout(() => {
+                downloadBtn.style.display = "inline-block";
+            }, 300);
+        }
+
+        function baixarQR() {
+            var qrDiv = document.getElementById("qrcode");
+            var imagemQR = qrDiv.querySelector("img");
+
+            if (imagemQR && imagemQR.src) {
+                var link = document.createElement("a");
+                link.href = imagemQR.src;
+                link.download = "qrcode.png";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                var canvas = qrDiv.querySelector("canvas");
+                if (canvas) {
+                    var link = document.createElement("a");
+                    link.href = canvas.toDataURL("image/png");
+                    link.download = "qrcode.png";
+                    link.click();
+                }
+            }
+        }
+
+        document.getElementById("linkInput").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                gerarQR();
+            }
+        });
+    </script>
+
+</body>
+</html>
