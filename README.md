@@ -4,7 +4,6 @@
 
 Um gerador de QR Codes minimalista, seguro e estático. Desenvolvido para ser rápido, responsivo e funcionar inteiramente no navegador.
 
-🔗 **Acesse o projeto online:** [https://mateusfrmacedo.github.io/](https://mateusfrmacedo.github.io/)
 
 ## Funcionalidades
 
