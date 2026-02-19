@@ -3,20 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>QR Code Generator</title>
+    <title>QR Code</title>
+
+    <link rel="icon" type="image/webp" href="fav-icon.webp">
+    <link rel="apple-touch-icon" href="fav-icon.webp">
+    <meta property="og:image" content="fav-icon.webp">
+    <meta property="og:title" content="Gerador de QR Code">
+    <meta name="twitter:image" content="fav-icon.webp">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        /* 1. RESET E FONTE APPLE (SF PRO) */
-        * {
-            box-sizing: border-box;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
+        * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
 
         body {
             margin: 0;
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f5f5f7;
+            background-color: #e0e0e0; /* Fundo levemente mais escuro para destacar a janela */
             color: #1d1d1f;
             display: flex;
             flex-direction: column;
@@ -25,152 +28,175 @@
             min-height: 100vh;
         }
 
-        /* 2. CARD ESTILO IOS */
-        .apple-card {
+        /* JANELA ESTILO FINDER */
+        .finder-window {
             background-color: #ffffff;
             width: 90%;
-            max-width: 360px;
-            padding: 40px 30px;
-            border-radius: 22px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
-            text-align: center;
-            transition: transform 0.3s ease;
-        }
-
-        h1 {
-            font-size: 24px;
-            font-weight: 600;
-            margin: 0 0 8px 0;
-            letter-spacing: -0.5px;
-        }
-
-        p {
-            font-size: 15px;
-            color: #86868b;
-            margin: 0 0 30px 0;
-            line-height: 1.4;
-        }
-
-        /* 3. INPUTS E BOTÕES */
-        .input-group {
-            margin-bottom: 20px;
-            text-align: left;
-        }
-
-        input {
-            width: 100%;
-            padding: 16px;
-            font-size: 17px;
-            border: 1px solid #d2d2d7;
+            max-width: 380px;
             border-radius: 12px;
-            background-color: #fafafa;
-            color: #1d1d1f;
-            outline: none;
-            transition: all 0.2s ease;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            overflow: hidden; /* Garante que a barra de título respeite o border-radius */
+            border: 0.5px solid rgba(0,0,0,0.1);
         }
 
-        input:focus {
-            border-color: #0071e3;
-            background-color: #fff;
-            box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15);
+        /* BARRA DE TÍTULO MACOS */
+        .title-bar {
+            background: linear-gradient(to bottom, #ebebeb, #d6d6d6);
+            height: 38px;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            position: relative;
+            border-bottom: 0.5px solid #b5b5b5;
         }
+
+        .traffic-lights {
+            display: flex;
+            gap: 8px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 0.5px solid rgba(0,0,0,0.1);
+        }
+
+        .red { background-color: #ff5f56; }
+        .yellow { background-color: #ffbd2e; }
+        .green { background-color: #27c93f; }
+
+        .window-title {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            left: 0;
+            font-size: 13px;
+            color: #616161;
+            font-weight: 500;
+            pointer-events: none;
+        }
+
+        /* CONTEÚDO INTERNO */
+        .content {
+            padding: 30px 25px;
+            text-align: center;
+        }
+
+        h1 { font-size: 22px; font-weight: 700; margin: 0 0 8px 0; letter-spacing: -0.5px; }
+        p { font-size: 14px; color: #86868b; margin: 0 0 25px 0; }
+
+        textarea {
+            width: 100%;
+            height: 90px;
+            padding: 14px;
+            font-size: 15px;
+            border: 1px solid #d2d2d7;
+            border-radius: 10px;
+            background-color: #fafafa;
+            outline: none;
+            transition: all 0.2s;
+            margin-bottom: 15px;
+            resize: none;
+            font-family: inherit;
+        }
+        textarea:focus { border-color: #0071e3; box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.2); }
 
         .btn-primary {
             width: 100%;
-            padding: 16px;
-            font-size: 17px;
-            font-weight: 500;
-            color: white;
-            background-color: #0071e3;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: background-color 0.2s ease, transform 0.1s;
-        }
-
-        .btn-primary:hover {
-            background-color: #0077ED;
-        }
-
-        .btn-primary:active {
-            transform: scale(0.98);
-        }
-
-        /* Botão Secundário (Link de download) */
-        .btn-secondary {
-            display: none;
-            margin-top: 15px;
+            padding: 12px;
             font-size: 15px;
             font-weight: 500;
-            color: #0071e3;
-            background: none;
+            color: white;
+            background: linear-gradient(#42a1ff, #0071e3);
             border: none;
+            border-radius: 8px;
             cursor: pointer;
-            text-decoration: none;
-            padding: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-        
-        .btn-secondary:hover {
-            text-decoration: underline;
-        }
+        .btn-primary:active { transform: translateY(1px); }
 
-        /* 4. ÁREA DO QR CODE */
+        /* QR CODE */
         #qrcode-container {
-            margin-top: 30px;
+            margin: 25px 0;
             display: none;
             justify-content: center;
-            align-items: center;
-            animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            animation: fadeIn 0.4s ease-out;
         }
 
-        #qrcode img, #qrcode canvas {
+        #qrcode {
+            padding: 10px;
+            background: white;
             border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border: 1px solid #e5e5e5;
+            width: 180px;
+            height: 180px;
         }
 
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        #qrcode canvas, #qrcode img { max-width: 100% !important; height: auto !important; }
+
+        /* DOWNLOAD AREA */
+        .download-area {
+            display: none;
+            margin-top: 20px;
+            border-top: 1px solid #f2f2f2;
+            padding-top: 20px;
         }
 
-        /* 5. RODAPÉ PERSONALIZADO (FIXED) */
-        footer {
-            margin-top: 40px;
-            font-size: 13px;
-            color: #86868b;
-            font-weight: 400;
-        }
+        .format-label { font-size: 10px; color: #a1a1a6; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; display: block; }
+        .format-selector { display: flex; gap: 8px; }
 
-        footer a {
-            color: #86868b;
-            text-decoration: none;
+        .btn-download {
+            flex: 1;
+            padding: 8px;
+            font-size: 12px;
             font-weight: 600;
-            transition: color 0.2s ease;
+            color: #1d1d1f;
+            background: linear-gradient(#ffffff, #f5f5f7);
+            border: 1px solid #d2d2d7;
+            border-radius: 6px;
+            cursor: pointer;
         }
+        .btn-download:hover { background: #f5f5f7; }
 
-        footer a:hover {
-            color: #0071e3;
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        footer { margin-top: 30px; font-size: 12px; color: #86868b; }
+        footer a { color: #0071e3; text-decoration: none; }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
-    <div class="apple-card">
-        <h1>Criar QR Code</h1>
-        <p>Digite seu link ou texto abaixo para gerar um código instantaneamente.</p>
-
-        <div class="input-group">
-            <input type="text" id="linkInput" placeholder="https://exemplo.com" />
-        </div>
-        
-        <button class="btn-primary" onclick="gerarQR()">Gerar</button>
-
-        <div id="qrcode-container">
-            <div id="qrcode"></div>
+    <div class="finder-window">
+        <div class="title-bar">
+            <div class="traffic-lights">
+                <div class="dot red"></div>
+                <div class="dot yellow"></div>
+                <div class="dot green"></div>
+            </div>
+            <div class="window-title">QR Code Generator</div>
         </div>
 
-        <button id="downloadBtn" class="btn-secondary" onclick="baixarQR()">Baixar Imagem</button>
+        <div class="content">
+            <h1>Gerar QR Code</h1>
+            <p>Insira um link ou texto para criar.</p>
+
+            <textarea id="linkInput"></textarea>
+            <button class="btn-primary" onclick="gerarQR()">Gerar QR Code</button>
+
+            <div id="qrcode-container">
+                <div id="qrcode"></div>
+            </div>
+
+            <div id="downloadArea" class="download-area">
+                <span class="format-label">Exportar Alta Definição</span>
+                <div class="format-selector">
+                    <button class="btn-download" onclick="baixar('png')">PNG</button>
+                    <button class="btn-download" onclick="baixar('jpeg')">JPG</button>
+                    <button class="btn-download" onclick="baixar('svg')">SVG</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <footer>
@@ -178,66 +204,66 @@
     </footer>
 
     <script>
-        var qrcodeObj = null;
-
         function gerarQR() {
-            var inputUsuario = document.getElementById("linkInput").value;
-            var container = document.getElementById("qrcode-container");
-            var qrDiv = document.getElementById("qrcode");
-            var downloadBtn = document.getElementById("downloadBtn");
+            const input = document.getElementById("linkInput");
+            const text = input.value.trim();
+            const container = document.getElementById("qrcode-container");
+            const qrDiv = document.getElementById("qrcode");
+            const downloadArea = document.getElementById("downloadArea");
 
-            if (inputUsuario.trim() === "") {
-                var input = document.getElementById("linkInput");
-                input.style.borderColor = "#ff3b30";
-                setTimeout(() => { input.style.borderColor = "#d2d2d7"; }, 2000);
+            if (!text) {
+                input.style.borderColor = "#ff5f56";
+                setTimeout(() => input.style.borderColor = "#d2d2d7", 2000);
                 return;
             }
 
             qrDiv.innerHTML = "";
             container.style.display = "flex";
-
-            qrcodeObj = new QRCode(qrDiv, {
-                text: inputUsuario,
-                width: 250,
-                height: 250,
+            
+            new QRCode(qrDiv, {
+                text: text,
+                width: 1000,
+                height: 1000,
                 colorDark : "#000000",
                 colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
+                correctLevel : QRCode.CorrectLevel.L
             });
 
-            setTimeout(() => {
-                downloadBtn.style.display = "inline-block";
-            }, 300);
+            setTimeout(() => downloadArea.style.display = "block", 300);
         }
 
-        function baixarQR() {
-            var qrDiv = document.getElementById("qrcode");
-            var imagemQR = qrDiv.querySelector("img");
+        function baixar(formato) {
+            const canvas = document.querySelector("#qrcode canvas");
+            const fileName = `qrcode_${Date.now()}`;
 
-            if (imagemQR && imagemQR.src) {
-                var link = document.createElement("a");
-                link.href = imagemQR.src;
-                link.download = "qrcode.png";
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+            if (formato === 'svg') {
+                const svgData = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000"><rect width="100%" height="100%" fill="white"/><image width="1000" height="1000" href="${canvas.toDataURL('image/png')}"/></svg>`;
+                const blob = new Blob([svgData], {type: 'image/svg+xml'});
+                fazerDownload(URL.createObjectURL(blob), `${fileName}.svg`);
+                return;
+            }
+
+            let dataUrl;
+            if (formato === 'jpeg') {
+                const tempCanvas = document.createElement("canvas");
+                tempCanvas.width = 1000; tempCanvas.height = 1000;
+                const ctx = tempCanvas.getContext("2d");
+                ctx.fillStyle = "#FFFFFF";
+                ctx.fillRect(0, 0, 1000, 1000);
+                ctx.drawImage(canvas, 0, 0);
+                dataUrl = tempCanvas.toDataURL("image/jpeg", 1.0);
             } else {
-                var canvas = qrDiv.querySelector("canvas");
-                if (canvas) {
-                    var link = document.createElement("a");
-                    link.href = canvas.toDataURL("image/png");
-                    link.download = "qrcode.png";
-                    link.click();
-                }
+                dataUrl = canvas.toDataURL("image/png");
             }
+            fazerDownload(dataUrl, `${fileName}.${formato}`);
         }
 
-        document.getElementById("linkInput").addEventListener("keypress", function(event) {
-            if (event.key === "Enter") {
-                gerarQR();
-            }
-        });
+        function fazerDownload(url, name) {
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = name;
+            link.click();
+        }
     </script>
-
 </body>
 </html>
