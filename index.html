@@ -513,80 +513,52 @@
     </footer>
 
     <script>
-        const GENERIC_SCAN_FORMATS = [
-            "QRCode",
-            "DataMatrix",
-            "PDF417",
-            "Aztec",
-            "MaxiCode",
-            "EAN13",
-            "EAN8",
-            "UPCA",
-            "UPCE",
-            "ISBN",
-            "Code128",
-            "Code39",
-            "Code39Ext",
-            "Code39Std",
-            "ITF",
-            "Codabar"
-        ];
-
-        const GENERIC_READER_OPTIONS = {
-            formats: GENERIC_SCAN_FORMATS,
-            maxNumberOfSymbols: 1,
-            tryHarder: true,
-            tryRotate: true,
-            tryInvert: true,
-            tryDownscale: true,
-            textMode: "Plain"
-        };
+        const CONSENSUS_TARGET = 2;
 
         const BOLETO_READER_OPTIONS = {
             formats: ["ITF"],
-            maxNumberOfSymbols: 4,
+            maxNumberOfSymbols: 6,
             tryHarder: true,
             tryRotate: true,
             tryInvert: true,
             tryDownscale: true,
             validateOptionalChecksum: true,
-            minLineCount: 3,
+            minLineCount: 4,
             textMode: "Plain"
         };
 
-        const FORMAT_META = {
-            QRCode: { label: "QR Code" },
-            QRCodeModel1: { label: "QR Code" },
-            QRCodeModel2: { label: "QR Code" },
-            MicroQRCode: { label: "Micro QR Code" },
-            RMQRCode: { label: "rMQR Code" },
-            DataMatrix: { label: "Data Matrix" },
-            PDF417: { label: "PDF417" },
-            CompactPDF417: { label: "PDF417" },
-            MicroPDF417: { label: "MicroPDF417" },
-            Aztec: { label: "Aztec" },
-            AztecCode: { label: "Aztec" },
-            AztecRune: { label: "Aztec Rune" },
-            MaxiCode: { label: "MaxiCode" },
-            EAN13: { label: "EAN-13" },
-            EAN8: { label: "EAN-8" },
-            UPCA: { label: "UPC-A" },
-            UPCE: { label: "UPC-E" },
-            ISBN: { label: "ISBN" },
-            Code128: { label: "Code 128" },
-            Code39: { label: "Code 39" },
-            Code39Std: { label: "Code 39" },
-            Code39Ext: { label: "Code 39" },
-            ITF: { label: "ITF / ITF-14" },
-            Codabar: { label: "Codabar" }
-        };
+        const BOLETO_OPTION_VARIANTS = [
+            {
+                ...BOLETO_READER_OPTIONS,
+                binarizer: "GlobalHistogram",
+                minLineCount: 5,
+                downscaleFactor: 2,
+                downscaleThreshold: 960
+            },
+            {
+                ...BOLETO_READER_OPTIONS,
+                binarizer: "LocalAverage",
+                minLineCount: 4,
+                downscaleFactor: 2,
+                downscaleThreshold: 960
+            },
+            {
+                ...BOLETO_READER_OPTIONS,
+                binarizer: "FixedThreshold",
+                minLineCount: 6,
+                tryDownscale: false
+            }
+        ];
 
         const state = {
             activeView: "create",
             stream: null,
             cameraLoop: null,
             isScanning: false,
-            wasmReadyPromise: null
+            wasmReadyPromise: null,
+            stableCode: "",
+            stableHits: 0,
+            lastValidAt: 0
         };
 
         const segmentButtons = document.querySelectorAll(".segment");
@@ -756,58 +728,42 @@
             return state.wasmReadyPromise;
         }
 
-        async function decodeBestResultFromImageData(imageData, options = {}) {
-            const { aggressive = false } = options;
-            const boletoMatch = await decodeBoletoFromImageData(imageData, { aggressive });
-
-            if (boletoMatch && boletoMatch.valid) {
-                return boletoMatch;
-            }
-
-            if (!boletoMatch || !boletoMatch.invalidCandidate) {
-                const genericResult = await decodeGenericFromImageData(imageData);
-                if (genericResult) {
-                    return genericResult;
-                }
-            }
-
-            return boletoMatch;
+        async function decodeBestResultFromImageData(imageData) {
+            return decodeBoletoFromImageData(imageData);
         }
 
-        async function decodeBoletoFromImageData(imageData, options = {}) {
-            const { aggressive = false } = options;
-            const variants = createBoletoVariants(imageData, { aggressive });
+        async function decodeBoletoFromImageData(imageData) {
+            const variants = createBoletoVariants(imageData);
             let invalidCandidate = null;
 
-            for (const variant of variants) {
-                let results = [];
+            for (const [variantIndex, variant] of variants.entries()) {
+                for (const [optionIndex, readerOptions] of BOLETO_OPTION_VARIANTS.entries()) {
+                    let results = [];
 
-                try {
-                    results = await window.ZXingWASM.readBarcodes(variant.imageData, BOLETO_READER_OPTIONS);
-                } catch (error) {
-                    console.error(error);
-                    continue;
-                }
-
-                for (const result of results) {
-                    const candidate = createBoletoCandidate(result, variant);
-                    if (!candidate) {
+                    try {
+                        results = await window.ZXingWASM.readBarcodes(variant.imageData, readerOptions);
+                    } catch (error) {
+                        console.error(error);
                         continue;
                     }
 
-                    if (candidate.valid) {
-                        return {
-                            type: "boleto",
-                            valid: true,
-                            text: candidate.text,
-                            format: candidate.format,
-                            meta: candidate.meta,
-                            overlay: candidate.overlay
-                        };
-                    }
+                    for (const result of results) {
+                        const candidate = createBoletoCandidate(result, variantIndex, optionIndex);
+                        if (!candidate) {
+                            continue;
+                        }
 
-                    if (!invalidCandidate || candidate.score > invalidCandidate.score) {
-                        invalidCandidate = candidate;
+                        if (candidate.valid) {
+                            return {
+                                type: "boleto",
+                                valid: true,
+                                text: candidate.text
+                            };
+                        }
+
+                        if (!invalidCandidate || candidate.score > invalidCandidate.score) {
+                            invalidCandidate = candidate;
+                        }
                     }
                 }
             }
@@ -823,130 +779,89 @@
             };
         }
 
-        async function decodeGenericFromImageData(imageData) {
-            try {
-                const results = await window.ZXingWASM.readBarcodes(imageData, GENERIC_READER_OPTIONS);
-                if (!results.length) {
-                    return null;
-                }
-
-                const result = results[0];
-                const normalizedText = normalizeResultText(result);
-                return {
-                    type: "generic",
-                    valid: true,
-                    text: normalizedText,
-                    format: result.format,
-                    meta: getFormatMeta(result.format),
-                    overlay: result.position ? {
-                        position: result.position,
-                        sourceWidth: imageData.width,
-                        sourceHeight: imageData.height
-                    } : null
-                };
-            } catch (error) {
-                console.error(error);
-                return null;
-            }
-        }
-
-        function createBoletoCandidate(result, variant) {
+        function createBoletoCandidate(result, variantIndex, optionIndex) {
             const digits = onlyDigits(result.text);
-            if (!digits) {
+            if (!digits || digits.length < 43) {
                 return null;
             }
 
-            const bankBoleto = isValidBankBoletoBarcode(digits);
-            const arrecadacao = isValidArrecadacaoBarcode(digits);
-            const isValid = bankBoleto || arrecadacao;
-            const isLikelyBoleto = digits.length >= 43 && digits.length <= 48;
+            const resolved = resolveValidBoletoDigits(digits);
+            const isValid = Boolean(resolved);
+            const normalizedDigits = resolved || digits;
+            const isLikelyBoleto = normalizedDigits.length >= 43 && normalizedDigits.length <= 48;
             const score =
-                isValid ? 100 :
-                digits.length === 44 ? 40 :
+                isValid ? 100 - (variantIndex * 5) - optionIndex :
+                normalizedDigits.length === 44 ? 40 - variantIndex :
                 isLikelyBoleto ? 15 :
                 0;
 
             return {
                 valid: isValid,
                 score,
-                text: digits,
-                format: bankBoleto || arrecadacao ? "BoletoFebraban" : "ITF",
-                meta: bankBoleto
-                    ? { label: "Boleto FEBRABAN", alias: "44 digitos validados." }
-                    : arrecadacao
-                        ? { label: "Arrecadacao FEBRABAN", alias: "44 digitos validados." }
-                        : { label: "ITF", alias: "Leitura encontrada, mas o DV do boleto nao fechou." },
-                overlay: variant.canDrawOverlay && result.position ? {
-                    position: result.position,
-                    sourceWidth: variant.imageData.width,
-                    sourceHeight: variant.imageData.height
-                } : null
+                text: normalizedDigits
             };
         }
 
-        function createBoletoVariants(imageData, options = {}) {
-            const { aggressive = false } = options;
-
-            const variants = [
+        function createBoletoVariants(imageData) {
+            return [
                 {
-                    name: "original",
-                    imageData,
-                    canDrawOverlay: true
+                    name: "lower-band-wide",
+                    imageData: transformImageData(imageData, {
+                        cropTopRatio: 0.55,
+                        cropBottomRatio: 0.93,
+                        cropLeftRatio: 0.03,
+                        cropRightRatio: 0.97,
+                        scaleX: 2.2,
+                        scaleY: 2.8,
+                        contrast: 1.25
+                    })
                 },
                 {
-                    name: "bottom-wide",
+                    name: "lower-band-binary",
                     imageData: transformImageData(imageData, {
-                        cropTopRatio: 0.58,
-                        scaleX: 1.5,
-                        scaleY: 2
-                    }),
-                    canDrawOverlay: false
+                        cropTopRatio: 0.6,
+                        cropBottomRatio: 0.92,
+                        cropLeftRatio: 0.02,
+                        cropRightRatio: 0.98,
+                        scaleX: 2.5,
+                        scaleY: 3,
+                        contrast: 1.45,
+                        binaryThreshold: 160
+                    })
                 },
                 {
-                    name: "bottom-binary",
+                    name: "lower-band-tight",
                     imageData: transformImageData(imageData, {
-                        cropTopRatio: 0.64,
-                        scaleX: 1.8,
-                        scaleY: 2.2,
-                        binaryThreshold: 158
-                    }),
-                    canDrawOverlay: false
+                        cropTopRatio: 0.66,
+                        cropBottomRatio: 0.94,
+                        cropLeftRatio: 0.02,
+                        cropRightRatio: 0.98,
+                        scaleX: 3,
+                        scaleY: 3.4,
+                        contrast: 1.55,
+                        binaryThreshold: 150
+                    })
+                },
+                {
+                    name: "full-frame",
+                    imageData: transformImageData(imageData, {
+                        scaleX: 1.4,
+                        scaleY: 1.4,
+                        contrast: 1.15
+                    })
                 }
             ];
-
-            if (aggressive) {
-                variants.push(
-                    {
-                        name: "original-binary",
-                        imageData: transformImageData(imageData, {
-                            scaleX: 1.15,
-                            scaleY: 1.15,
-                            binaryThreshold: 165
-                        }),
-                        canDrawOverlay: false
-                    },
-                    {
-                        name: "bottom-tight-binary",
-                        imageData: transformImageData(imageData, {
-                            cropTopRatio: 0.7,
-                            scaleX: 2.2,
-                            scaleY: 2.5,
-                            binaryThreshold: 150
-                        }),
-                        canDrawOverlay: false
-                    }
-                );
-            }
-
-            return variants;
         }
 
         function transformImageData(sourceImageData, options = {}) {
             const {
                 cropTopRatio = 0,
                 cropBottomRatio = 1,
+                cropLeftRatio = 0,
+                cropRightRatio = 1,
                 scaleX = 1,
                 scaleY = 1,
+                contrast = 1,
                 binaryThreshold = null
             } = options;
 
@@ -957,9 +872,9 @@
 
             const sourceWidth = sourceImageData.width;
             const sourceHeight = sourceImageData.height;
-            const sx = 0;
+            const sx = Math.max(0, Math.min(sourceWidth - 1, Math.floor(sourceWidth * cropLeftRatio)));
             const sy = Math.max(0, Math.min(sourceHeight - 1, Math.floor(sourceHeight * cropTopRatio)));
-            const sw = sourceWidth;
+            const sw = Math.max(1, Math.floor(sourceWidth * cropRightRatio) - sx);
             const sh = Math.max(1, Math.floor(sourceHeight * cropBottomRatio) - sy);
             const targetWidth = Math.max(1, Math.round(sw * scaleX));
             const targetHeight = Math.max(1, Math.round(sh * scaleY));
@@ -972,11 +887,12 @@
 
             let variantImageData = targetContext.getImageData(0, 0, targetWidth, targetHeight);
 
-            if (binaryThreshold !== null) {
+            if (contrast !== 1 || binaryThreshold !== null) {
                 const pixels = variantImageData.data;
                 for (let index = 0; index < pixels.length; index += 4) {
                     const luminance = (pixels[index] * 0.299) + (pixels[index + 1] * 0.587) + (pixels[index + 2] * 0.114);
-                    const value = luminance >= binaryThreshold ? 255 : 0;
+                    const contrasted = Math.max(0, Math.min(255, ((luminance - 128) * contrast) + 128));
+                    const value = binaryThreshold !== null ? (contrasted >= binaryThreshold ? 255 : 0) : contrasted;
                     pixels[index] = value;
                     pixels[index + 1] = value;
                     pixels[index + 2] = value;
@@ -989,16 +905,29 @@
             return variantImageData;
         }
 
-        function normalizeResultText(result) {
-            if (result.format === "ITF" || result.format === "EAN13" || result.format === "EAN8" || result.format === "UPCA" || result.format === "UPCE" || result.format === "ISBN") {
-                return onlyDigits(result.text);
-            }
-
-            return result.text || "";
-        }
-
         function onlyDigits(value) {
             return String(value || "").replace(/\D/g, "");
+        }
+
+        function resolveValidBoletoDigits(rawDigits) {
+            if (isValidBoletoDigits(rawDigits)) {
+                return rawDigits;
+            }
+
+            if (rawDigits.length > 44 && rawDigits.length <= 48) {
+                for (let index = 0; index <= rawDigits.length - 44; index += 1) {
+                    const slice = rawDigits.slice(index, index + 44);
+                    if (isValidBoletoDigits(slice)) {
+                        return slice;
+                    }
+                }
+            }
+
+            return "";
+        }
+
+        function isValidBoletoDigits(code) {
+            return isValidBankBoletoBarcode(code) || isValidArrecadacaoBarcode(code);
         }
 
         function isValidBankBoletoBarcode(code) {
@@ -1092,6 +1021,55 @@
             clearOverlay();
         }
 
+        function resetConsensus() {
+            state.stableCode = "";
+            state.stableHits = 0;
+            state.lastValidAt = 0;
+        }
+
+        function registerStableRead(code) {
+            const now = Date.now();
+
+            if (state.stableCode === code && (now - state.lastValidAt) <= 1500) {
+                state.stableHits += 1;
+            } else {
+                state.stableCode = code;
+                state.stableHits = 1;
+            }
+
+            state.lastValidAt = now;
+            return state.stableHits >= CONSENSUS_TARGET;
+        }
+
+        async function configureCameraTrack(track) {
+            if (!track || typeof track.applyConstraints !== "function") {
+                return;
+            }
+
+            const capabilities = typeof track.getCapabilities === "function" ? track.getCapabilities() : {};
+            const advanced = [];
+
+            if (Array.isArray(capabilities.focusMode) && capabilities.focusMode.includes("continuous")) {
+                advanced.push({ focusMode: "continuous" });
+            }
+
+            if (Array.isArray(capabilities.exposureMode) && capabilities.exposureMode.includes("continuous")) {
+                advanced.push({ exposureMode: "continuous" });
+            }
+
+            if (Array.isArray(capabilities.whiteBalanceMode) && capabilities.whiteBalanceMode.includes("continuous")) {
+                advanced.push({ whiteBalanceMode: "continuous" });
+            }
+
+            try {
+                if (advanced.length > 0) {
+                    await track.applyConstraints({ advanced });
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
         async function startCamera() {
             setActiveView("scan");
 
@@ -1112,15 +1090,18 @@
                 state.stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: { ideal: "environment" },
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                        aspectRatio: { ideal: 1.77 }
                     },
                     audio: false
                 });
 
                 scannerVideo.srcObject = state.stream;
+                await configureCameraTrack(state.stream.getVideoTracks()[0]);
                 await scannerVideo.play();
 
+                resetConsensus();
                 clearOverlay();
                 clearScanResult();
                 setScanStatus("Aponte para o codigo de barras do boleto", "info");
@@ -1142,6 +1123,7 @@
 
             state.isScanning = false;
             clearOverlay();
+            resetConsensus();
 
             if (state.stream) {
                 state.stream.getTracks().forEach((track) => track.stop());
@@ -1164,7 +1146,7 @@
                 return;
             }
 
-            state.cameraLoop = window.setTimeout(scanCameraFrame, 250);
+            state.cameraLoop = window.setTimeout(scanCameraFrame, 160);
         }
 
         async function scanCameraFrame() {
@@ -1182,14 +1164,20 @@
 
             try {
                 const imageData = captureCurrentFrame();
-                const decoded = await decodeBestResultFromImageData(imageData, { aggressive: false });
+                const decoded = await decodeBestResultFromImageData(imageData);
 
                 if (decoded && decoded.valid) {
-                    clearOverlay();
-                    presentScanResult(decoded);
-                    setScanStatus("Codigo identificado pela camera", "success");
-                    stopCamera({ hideFrame: true });
-                    return;
+                    if (registerStableRead(decoded.text)) {
+                        clearOverlay();
+                        presentScanResult(decoded);
+                        setScanStatus("Codigo identificado pela camera", "success");
+                        stopCamera({ hideFrame: true });
+                        return;
+                    }
+
+                    setScanStatus("Confirmando leitura...", "info");
+                } else if (decoded && decoded.invalidCandidate && decoded.invalidCandidate.score >= 35) {
+                    setScanStatus("Ajuste distancia e alinhamento do boleto", "warning");
                 }
             } catch (error) {
                 console.error(error);
@@ -1201,7 +1189,7 @@
         }
 
         function captureCurrentFrame() {
-            const maxWidth = 1400;
+            const maxWidth = 1920;
             const scale = Math.min(1, maxWidth / scannerVideo.videoWidth);
             const width = Math.max(1, Math.round(scannerVideo.videoWidth * scale));
             const height = Math.max(1, Math.round(scannerVideo.videoHeight * scale));
