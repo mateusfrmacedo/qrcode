@@ -310,6 +310,7 @@
             border-radius: 14px;
             background:
                 linear-gradient(180deg, rgba(18, 18, 20, 0.92), rgba(35, 35, 38, 0.92));
+            aspect-ratio: 4 / 3;
             min-height: 240px;
             display: flex;
             align-items: center;
@@ -329,14 +330,37 @@
         #scannerVideo,
         #scanOverlay {
             width: 100%;
-            height: auto;
+            height: 100%;
             display: block;
+        }
+
+        #scannerVideo {
+            object-fit: cover;
         }
 
         #scanOverlay {
             position: absolute;
             inset: 0;
             pointer-events: none;
+        }
+
+        .scan-line {
+            position: absolute;
+            left: 8%;
+            right: 8%;
+            top: 18%;
+            height: 2px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, rgba(255, 80, 80, 0), rgba(255, 84, 84, 0.95), rgba(255, 80, 80, 0));
+            box-shadow: 0 0 10px rgba(255, 59, 48, 0.65);
+            opacity: 0;
+            transform: translateY(0);
+            pointer-events: none;
+        }
+
+        .scanner-frame.scanning .scan-line {
+            opacity: 1;
+            animation: scanLine 2.2s ease-in-out infinite alternate;
         }
 
         .scanner-controls {
@@ -399,6 +423,15 @@
             }
         }
 
+        @keyframes scanLine {
+            from {
+                transform: translateY(-58px);
+            }
+            to {
+                transform: translateY(148px);
+            }
+        }
+
         @media (max-width: 560px) {
             body {
                 padding-inline: 12px;
@@ -412,6 +445,11 @@
                 font-size: 22px;
             }
 
+            .scanner-stage {
+                min-height: 280px;
+                aspect-ratio: 3 / 4;
+            }
+
             .scanner-controls {
                 align-items: stretch;
             }
@@ -420,6 +458,10 @@
             .scanner-controls .btn-secondary {
                 width: 100%;
                 justify-content: center;
+            }
+
+            .scan-actions > * {
+                flex-basis: 100%;
             }
         }
     </style>
@@ -467,15 +509,14 @@
                 <h1>Ler codigo</h1>
 
                 <div class="scan-actions">
-                    <button class="btn-primary" id="cameraButton" type="button">Ler com camera</button>
-                    <button class="btn-secondary" id="uploadButton" type="button">Ler uma imagem</button>
+                    <button class="btn-primary" id="cameraButton" type="button">Abrir camera</button>
                 </div>
-                <input class="hidden" id="imageInput" type="file" accept="image/*">
 
                 <div class="scanner-frame hidden" id="scannerFrame">
                     <div class="scanner-stage">
                         <video id="scannerVideo" playsinline muted></video>
                         <canvas id="scanOverlay"></canvas>
+                        <div class="scan-line" aria-hidden="true"></div>
                     </div>
                     <div class="scanner-controls">
                         <span class="status-pill muted" id="scanStatus">Camera desligada</span>
@@ -486,7 +527,6 @@
                 <div class="result-card">
                     <div class="result-header">
                         <span class="result-badge" id="resultFormat">Nenhum codigo lido</span>
-                        <span class="result-badge muted" id="resultAlias">Aguardando leitura</span>
                     </div>
                     <textarea id="scanText" readonly></textarea>
                     <div class="scan-actions">
@@ -503,7 +543,7 @@
     </footer>
 
     <script>
-        const SCAN_FORMATS = [
+        const GENERIC_SCAN_FORMATS = [
             "QRCode",
             "DataMatrix",
             "PDF417",
@@ -522,41 +562,53 @@
             "Codabar"
         ];
 
-        const READER_OPTIONS = {
-            formats: SCAN_FORMATS,
+        const GENERIC_READER_OPTIONS = {
+            formats: GENERIC_SCAN_FORMATS,
             maxNumberOfSymbols: 1,
             tryHarder: true,
             tryRotate: true,
             tryInvert: true,
             tryDownscale: true,
-            textMode: "HRI"
+            textMode: "Plain"
+        };
+
+        const BOLETO_READER_OPTIONS = {
+            formats: ["ITF"],
+            maxNumberOfSymbols: 4,
+            tryHarder: true,
+            tryRotate: true,
+            tryInvert: true,
+            tryDownscale: true,
+            validateOptionalChecksum: true,
+            minLineCount: 3,
+            textMode: "Plain"
         };
 
         const FORMAT_META = {
-            QRCode: { label: "QR Code", alias: "Leitura 2D pronta para links, Pix e textos." },
-            QRCodeModel1: { label: "QR Code", alias: "Variacao QR Code Model 1." },
-            QRCodeModel2: { label: "QR Code", alias: "Variacao QR Code Model 2." },
-            MicroQRCode: { label: "Micro QR Code", alias: "Versao compacta do QR Code." },
-            RMQRCode: { label: "rMQR Code", alias: "QR retangular para etiquetas estreitas." },
-            DataMatrix: { label: "Data Matrix", alias: "Muito usado em industria, pecas e remedios." },
-            PDF417: { label: "PDF417", alias: "Comum em documentos e cartoes de embarque." },
-            CompactPDF417: { label: "PDF417", alias: "Variacao compacta do PDF417." },
-            MicroPDF417: { label: "MicroPDF417", alias: "Versao enxuta do PDF417." },
-            Aztec: { label: "Aztec", alias: "Usado em bilhetes e validacoes." },
-            AztecCode: { label: "Aztec", alias: "Aztec Code." },
-            AztecRune: { label: "Aztec Rune", alias: "Variacao enxuta do Aztec." },
-            MaxiCode: { label: "MaxiCode", alias: "Leitura 2D voltada a logistica." },
-            EAN13: { label: "EAN-13", alias: "Padrao varejo global. Pode representar ISBN." },
-            EAN8: { label: "EAN-8", alias: "Versao compacta para embalagens pequenas." },
-            UPCA: { label: "UPC-A", alias: "Padrao principal dos EUA e Canada." },
-            UPCE: { label: "UPC-E", alias: "Versao compacta do UPC." },
-            ISBN: { label: "ISBN", alias: "Identificacao de livros baseada em EAN-13." },
-            Code128: { label: "Code 128", alias: "Inclui leituras compativeis com GS1-128." },
-            Code39: { label: "Code 39", alias: "Muito usado em inventario, crachas e ativos." },
-            Code39Std: { label: "Code 39", alias: "Variacao padrao do Code 39." },
-            Code39Ext: { label: "Code 39", alias: "Variacao extendida do Code 39." },
-            ITF: { label: "ITF / ITF-14", alias: "Usado em caixas e cenarios como boleto Febraban." },
-            Codabar: { label: "Codabar", alias: "Comum em bibliotecas e rotinas legadas." }
+            QRCode: { label: "QR Code" },
+            QRCodeModel1: { label: "QR Code" },
+            QRCodeModel2: { label: "QR Code" },
+            MicroQRCode: { label: "Micro QR Code" },
+            RMQRCode: { label: "rMQR Code" },
+            DataMatrix: { label: "Data Matrix" },
+            PDF417: { label: "PDF417" },
+            CompactPDF417: { label: "PDF417" },
+            MicroPDF417: { label: "MicroPDF417" },
+            Aztec: { label: "Aztec" },
+            AztecCode: { label: "Aztec" },
+            AztecRune: { label: "Aztec Rune" },
+            MaxiCode: { label: "MaxiCode" },
+            EAN13: { label: "EAN-13" },
+            EAN8: { label: "EAN-8" },
+            UPCA: { label: "UPC-A" },
+            UPCE: { label: "UPC-E" },
+            ISBN: { label: "ISBN" },
+            Code128: { label: "Code 128" },
+            Code39: { label: "Code 39" },
+            Code39Std: { label: "Code 39" },
+            Code39Ext: { label: "Code 39" },
+            ITF: { label: "ITF / ITF-14" },
+            Codabar: { label: "Codabar" }
         };
 
         const state = {
@@ -578,8 +630,6 @@
         const downloadArea = document.getElementById("downloadArea");
 
         const cameraButton = document.getElementById("cameraButton");
-        const uploadButton = document.getElementById("uploadButton");
-        const imageInput = document.getElementById("imageInput");
         const scannerFrame = document.getElementById("scannerFrame");
         const scannerVideo = document.getElementById("scannerVideo");
         const scanOverlay = document.getElementById("scanOverlay");
@@ -587,7 +637,6 @@
         const stopCameraButton = document.getElementById("stopCameraButton");
         const scanStatus = document.getElementById("scanStatus");
         const resultFormat = document.getElementById("resultFormat");
-        const resultAlias = document.getElementById("resultAlias");
         const scanText = document.getElementById("scanText");
         const copyButton = document.getElementById("copyButton");
         const scanAgainButton = document.getElementById("scanAgainButton");
@@ -615,8 +664,6 @@
             stopCamera({ hideFrame: true });
             setScanStatus("Camera desligada", "muted");
         });
-        uploadButton.addEventListener("click", () => imageInput.click());
-        imageInput.addEventListener("change", handleImageUpload);
         copyButton.addEventListener("click", copyScanText);
         scanAgainButton.addEventListener("click", async () => {
             setActiveView("scan");
@@ -740,6 +787,343 @@
             return state.wasmReadyPromise;
         }
 
+        async function decodeBestResultFromImageData(imageData, options = {}) {
+            const { aggressive = false } = options;
+            const boletoMatch = await decodeBoletoFromImageData(imageData, { aggressive });
+
+            if (boletoMatch && boletoMatch.valid) {
+                return boletoMatch;
+            }
+
+            if (!boletoMatch || !boletoMatch.invalidCandidate) {
+                const genericResult = await decodeGenericFromImageData(imageData);
+                if (genericResult) {
+                    return genericResult;
+                }
+            }
+
+            return boletoMatch;
+        }
+
+        async function decodeBoletoFromImageData(imageData, options = {}) {
+            const { aggressive = false } = options;
+            const variants = createBoletoVariants(imageData, { aggressive });
+            let invalidCandidate = null;
+
+            for (const variant of variants) {
+                let results = [];
+
+                try {
+                    results = await window.ZXingWASM.readBarcodes(variant.imageData, BOLETO_READER_OPTIONS);
+                } catch (error) {
+                    console.error(error);
+                    continue;
+                }
+
+                for (const result of results) {
+                    const candidate = createBoletoCandidate(result, variant);
+                    if (!candidate) {
+                        continue;
+                    }
+
+                    if (candidate.valid) {
+                        return {
+                            type: "boleto",
+                            valid: true,
+                            text: candidate.text,
+                            format: candidate.format,
+                            meta: candidate.meta,
+                            overlay: candidate.overlay
+                        };
+                    }
+
+                    if (!invalidCandidate || candidate.score > invalidCandidate.score) {
+                        invalidCandidate = candidate;
+                    }
+                }
+            }
+
+            if (!invalidCandidate) {
+                return null;
+            }
+
+            return {
+                type: "boleto",
+                valid: false,
+                invalidCandidate
+            };
+        }
+
+        async function decodeGenericFromImageData(imageData) {
+            try {
+                const results = await window.ZXingWASM.readBarcodes(imageData, GENERIC_READER_OPTIONS);
+                if (!results.length) {
+                    return null;
+                }
+
+                const result = results[0];
+                const normalizedText = normalizeResultText(result);
+                return {
+                    type: "generic",
+                    valid: true,
+                    text: normalizedText,
+                    format: result.format,
+                    meta: getFormatMeta(result.format),
+                    overlay: result.position ? {
+                        position: result.position,
+                        sourceWidth: imageData.width,
+                        sourceHeight: imageData.height
+                    } : null
+                };
+            } catch (error) {
+                console.error(error);
+                return null;
+            }
+        }
+
+        function createBoletoCandidate(result, variant) {
+            const digits = onlyDigits(result.text);
+            if (!digits) {
+                return null;
+            }
+
+            const bankBoleto = isValidBankBoletoBarcode(digits);
+            const arrecadacao = isValidArrecadacaoBarcode(digits);
+            const isValid = bankBoleto || arrecadacao;
+            const isLikelyBoleto = digits.length >= 43 && digits.length <= 48;
+            const score =
+                isValid ? 100 :
+                digits.length === 44 ? 40 :
+                isLikelyBoleto ? 15 :
+                0;
+
+            return {
+                valid: isValid,
+                score,
+                text: digits,
+                format: bankBoleto || arrecadacao ? "BoletoFebraban" : "ITF",
+                meta: bankBoleto
+                    ? { label: "Boleto FEBRABAN", alias: "44 digitos validados." }
+                    : arrecadacao
+                        ? { label: "Arrecadacao FEBRABAN", alias: "44 digitos validados." }
+                        : { label: "ITF", alias: "Leitura encontrada, mas o DV do boleto nao fechou." },
+                overlay: variant.canDrawOverlay && result.position ? {
+                    position: result.position,
+                    sourceWidth: variant.imageData.width,
+                    sourceHeight: variant.imageData.height
+                } : null
+            };
+        }
+
+        function createBoletoVariants(imageData, options = {}) {
+            const { aggressive = false } = options;
+
+            const variants = [
+                {
+                    name: "original",
+                    imageData,
+                    canDrawOverlay: true
+                },
+                {
+                    name: "bottom-wide",
+                    imageData: transformImageData(imageData, {
+                        cropTopRatio: 0.58,
+                        scaleX: 1.5,
+                        scaleY: 2
+                    }),
+                    canDrawOverlay: false
+                },
+                {
+                    name: "bottom-binary",
+                    imageData: transformImageData(imageData, {
+                        cropTopRatio: 0.64,
+                        scaleX: 1.8,
+                        scaleY: 2.2,
+                        binaryThreshold: 158
+                    }),
+                    canDrawOverlay: false
+                }
+            ];
+
+            if (aggressive) {
+                variants.push(
+                    {
+                        name: "original-binary",
+                        imageData: transformImageData(imageData, {
+                            scaleX: 1.15,
+                            scaleY: 1.15,
+                            binaryThreshold: 165
+                        }),
+                        canDrawOverlay: false
+                    },
+                    {
+                        name: "bottom-tight-binary",
+                        imageData: transformImageData(imageData, {
+                            cropTopRatio: 0.7,
+                            scaleX: 2.2,
+                            scaleY: 2.5,
+                            binaryThreshold: 150
+                        }),
+                        canDrawOverlay: false
+                    }
+                );
+            }
+
+            return variants;
+        }
+
+        function transformImageData(sourceImageData, options = {}) {
+            const {
+                cropTopRatio = 0,
+                cropBottomRatio = 1,
+                scaleX = 1,
+                scaleY = 1,
+                binaryThreshold = null
+            } = options;
+
+            const sourceCanvas = document.createElement("canvas");
+            sourceCanvas.width = sourceImageData.width;
+            sourceCanvas.height = sourceImageData.height;
+            sourceCanvas.getContext("2d").putImageData(sourceImageData, 0, 0);
+
+            const sourceWidth = sourceImageData.width;
+            const sourceHeight = sourceImageData.height;
+            const sx = 0;
+            const sy = Math.max(0, Math.min(sourceHeight - 1, Math.floor(sourceHeight * cropTopRatio)));
+            const sw = sourceWidth;
+            const sh = Math.max(1, Math.floor(sourceHeight * cropBottomRatio) - sy);
+            const targetWidth = Math.max(1, Math.round(sw * scaleX));
+            const targetHeight = Math.max(1, Math.round(sh * scaleY));
+
+            const targetCanvas = document.createElement("canvas");
+            targetCanvas.width = targetWidth;
+            targetCanvas.height = targetHeight;
+            const targetContext = targetCanvas.getContext("2d", { willReadFrequently: true });
+            targetContext.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+
+            let variantImageData = targetContext.getImageData(0, 0, targetWidth, targetHeight);
+
+            if (binaryThreshold !== null) {
+                const pixels = variantImageData.data;
+                for (let index = 0; index < pixels.length; index += 4) {
+                    const luminance = (pixels[index] * 0.299) + (pixels[index + 1] * 0.587) + (pixels[index + 2] * 0.114);
+                    const value = luminance >= binaryThreshold ? 255 : 0;
+                    pixels[index] = value;
+                    pixels[index + 1] = value;
+                    pixels[index + 2] = value;
+                    pixels[index + 3] = 255;
+                }
+                targetContext.putImageData(variantImageData, 0, 0);
+                variantImageData = targetContext.getImageData(0, 0, targetWidth, targetHeight);
+            }
+
+            return variantImageData;
+        }
+
+        function normalizeResultText(result) {
+            if (result.format === "ITF" || result.format === "EAN13" || result.format === "EAN8" || result.format === "UPCA" || result.format === "UPCE" || result.format === "ISBN") {
+                return onlyDigits(result.text);
+            }
+
+            return result.text || "";
+        }
+
+        function onlyDigits(value) {
+            return String(value || "").replace(/\D/g, "");
+        }
+
+        function isValidBankBoletoBarcode(code) {
+            if (!/^\d{44}$/.test(code)) {
+                return false;
+            }
+
+            const dv = Number(code[4]);
+            const body = code.slice(0, 4) + code.slice(5);
+            return dv === calculateBankBoletoDV(body);
+        }
+
+        function calculateBankBoletoDV(body) {
+            let sum = 0;
+            let weight = 2;
+
+            for (let index = body.length - 1; index >= 0; index -= 1) {
+                sum += Number(body[index]) * weight;
+                weight = weight === 9 ? 2 : weight + 1;
+            }
+
+            const remainder = sum % 11;
+            const dv = 11 - remainder;
+
+            if (dv === 0 || dv === 10 || dv === 11) {
+                return 1;
+            }
+
+            return dv;
+        }
+
+        function isValidArrecadacaoBarcode(code) {
+            if (!/^\d{44}$/.test(code) || code[0] !== "8") {
+                return false;
+            }
+
+            const reference = code[2];
+            const dv = Number(code[3]);
+            const body = code.slice(0, 3) + code.slice(4);
+            let expected = null;
+
+            if (reference === "6" || reference === "7") {
+                expected = calculateModulo10DV(body);
+            } else if (reference === "8" || reference === "9") {
+                expected = calculateArrecadacaoModulo11DV(body);
+            }
+
+            return expected !== null && dv === expected;
+        }
+
+        function calculateModulo10DV(body) {
+            let sum = 0;
+            let weight = 2;
+
+            for (let index = body.length - 1; index >= 0; index -= 1) {
+                const product = Number(body[index]) * weight;
+                sum += product > 9 ? Math.floor(product / 10) + (product % 10) : product;
+                weight = weight === 2 ? 1 : 2;
+            }
+
+            const remainder = sum % 10;
+            return remainder === 0 ? 0 : 10 - remainder;
+        }
+
+        function calculateArrecadacaoModulo11DV(body) {
+            let sum = 0;
+            let weight = 2;
+
+            for (let index = body.length - 1; index >= 0; index -= 1) {
+                sum += Number(body[index]) * weight;
+                weight = weight === 9 ? 2 : weight + 1;
+            }
+
+            const remainder = sum % 11;
+            const dv = 11 - remainder;
+
+            if (dv === 0 || dv === 1) {
+                return 0;
+            }
+
+            if (dv === 10 || dv === 11) {
+                return 1;
+            }
+
+            return dv;
+        }
+
+        function clearScanResult() {
+            resultFormat.textContent = "Nenhum codigo lido";
+            scanText.value = "";
+            copyButton.disabled = true;
+            clearOverlay();
+        }
+
         async function startCamera() {
             setActiveView("scan");
 
@@ -755,6 +1139,7 @@
 
                 setScanStatus("Abrindo camera...", "info");
                 scannerFrame.classList.remove("hidden");
+                scannerFrame.classList.add("scanning");
 
                 state.stream = await navigator.mediaDevices.getUserMedia({
                     video: {
@@ -769,7 +1154,8 @@
                 await scannerVideo.play();
 
                 clearOverlay();
-                setScanStatus("Aponte para um QR Code ou codigo de barras", "info");
+                clearScanResult();
+                setScanStatus("Aponte para o codigo de barras do boleto", "info");
                 queueCameraScan();
             } catch (error) {
                 console.error(error);
@@ -797,6 +1183,8 @@
             if (scannerVideo.srcObject) {
                 scannerVideo.srcObject = null;
             }
+
+            scannerFrame.classList.remove("scanning");
 
             if (hideFrame) {
                 scannerFrame.classList.add("hidden");
@@ -826,12 +1214,11 @@
 
             try {
                 const imageData = captureCurrentFrame();
-                const results = await window.ZXingWASM.readBarcodes(imageData, READER_OPTIONS);
+                const decoded = await decodeBestResultFromImageData(imageData, { aggressive: false });
 
-                if (results.length > 0) {
-                    const result = results[0];
-                    drawOverlay(result.position, captureCanvas.width, captureCanvas.height);
-                    presentScanResult(result);
+                if (decoded && decoded.valid) {
+                    clearOverlay();
+                    presentScanResult(decoded);
                     setScanStatus("Codigo identificado pela camera", "success");
                     stopCamera({ hideFrame: true });
                     return;
@@ -846,7 +1233,7 @@
         }
 
         function captureCurrentFrame() {
-            const maxWidth = 960;
+            const maxWidth = 1400;
             const scale = Math.min(1, maxWidth / scannerVideo.videoWidth);
             const width = Math.max(1, Math.round(scannerVideo.videoWidth * scale));
             const height = Math.max(1, Math.round(scannerVideo.videoHeight * scale));
@@ -857,47 +1244,16 @@
             return captureContext.getImageData(0, 0, width, height);
         }
 
-        async function handleImageUpload(event) {
-            const file = event.target.files[0];
-            imageInput.value = "";
-
-            if (!file) {
-                return;
-            }
-
-            stopCamera({ hideFrame: true });
-            setActiveView("scan");
-
-            try {
-                await ensureScannerReady();
-                setScanStatus("Analisando imagem...", "info");
-
-                const results = await window.ZXingWASM.readBarcodes(file, READER_OPTIONS);
-                if (!results.length) {
-                    setScanStatus("Nenhum codigo foi encontrado nessa imagem", "warning");
-                    return;
-                }
-
-                presentScanResult(results[0]);
-                setScanStatus("Codigo encontrado na imagem", "success");
-            } catch (error) {
-                console.error(error);
-                setScanStatus("Nao consegui ler essa imagem. Tente uma foto mais nitida.", "warning");
-            }
-        }
-
         function presentScanResult(result) {
-            const meta = getFormatMeta(result.format);
+            const meta = result.meta || getFormatMeta(result.format);
             resultFormat.textContent = meta.label;
-            resultAlias.textContent = meta.alias;
             scanText.value = result.text || "";
             copyButton.disabled = !result.text;
         }
 
         function getFormatMeta(format) {
             return FORMAT_META[format] || {
-                label: format || "Codigo detectado",
-                alias: "Formato identificado pelo motor de leitura."
+                label: format || "Codigo detectado"
             };
         }
 
@@ -913,38 +1269,7 @@
         }
 
         function drawOverlay(position, sourceWidth, sourceHeight) {
-            if (!position || !sourceWidth || !sourceHeight) {
-                clearOverlay();
-                return;
-            }
-
-            const displayWidth = scannerVideo.clientWidth;
-            const displayHeight = scannerVideo.clientHeight;
-
-            scanOverlay.width = displayWidth;
-            scanOverlay.height = displayHeight;
             clearOverlay();
-
-            const scaleX = displayWidth / sourceWidth;
-            const scaleY = displayHeight / sourceHeight;
-            const points = [
-                position.topLeft,
-                position.topRight,
-                position.bottomRight,
-                position.bottomLeft
-            ];
-
-            overlayContext.beginPath();
-            overlayContext.moveTo(points[0].x * scaleX, points[0].y * scaleY);
-            points.slice(1).forEach((point) => {
-                overlayContext.lineTo(point.x * scaleX, point.y * scaleY);
-            });
-            overlayContext.closePath();
-            overlayContext.lineWidth = 3;
-            overlayContext.strokeStyle = "#4cd964";
-            overlayContext.fillStyle = "rgba(76, 217, 100, 0.16)";
-            overlayContext.stroke();
-            overlayContext.fill();
         }
 
         async function copyScanText() {
