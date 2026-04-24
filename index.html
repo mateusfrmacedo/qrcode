@@ -298,6 +298,10 @@
             flex: 1 1 140px;
         }
 
+        #scanPanel {
+            margin-inline: -4px;
+        }
+
         .btn-download {
             padding: 10px 12px;
             font-size: 13px;
@@ -310,8 +314,8 @@
             border-radius: 14px;
             background:
                 linear-gradient(180deg, rgba(18, 18, 20, 0.92), rgba(35, 35, 38, 0.92));
-            aspect-ratio: 4 / 3;
-            min-height: 240px;
+            aspect-ratio: 16 / 10;
+            min-height: 320px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -344,33 +348,13 @@
             pointer-events: none;
         }
 
-        .scan-line {
-            position: absolute;
-            left: 8%;
-            right: 8%;
-            top: 18%;
-            height: 2px;
-            border-radius: 999px;
-            background: linear-gradient(90deg, rgba(255, 80, 80, 0), rgba(255, 84, 84, 0.95), rgba(255, 80, 80, 0));
-            box-shadow: 0 0 10px rgba(255, 59, 48, 0.65);
-            opacity: 0;
-            transform: translateY(0);
-            pointer-events: none;
-        }
-
-        .scanner-frame.scanning .scan-line {
-            opacity: 1;
-            animation: scanLine 2.2s ease-in-out infinite alternate;
-        }
-
         .scanner-controls {
             margin-top: 14px;
             align-items: center;
             justify-content: space-between;
         }
 
-        .status-pill,
-        .result-badge {
+        .status-pill {
             display: inline-flex;
             align-items: center;
             gap: 6px;
@@ -387,12 +371,11 @@
         .status-pill.info { color: var(--brand-bottom); }
         .status-pill.success { color: var(--success); }
         .status-pill.warning { color: var(--warning); }
-        .status-pill.muted,
-        .result-badge.muted { color: var(--text-secondary); }
+        .status-pill.muted { color: var(--text-secondary); }
 
         .result-card textarea {
             min-height: 118px;
-            margin-top: 6px;
+            margin-top: 0;
             margin-bottom: 14px;
         }
 
@@ -423,15 +406,6 @@
             }
         }
 
-        @keyframes scanLine {
-            from {
-                transform: translateY(-58px);
-            }
-            to {
-                transform: translateY(148px);
-            }
-        }
-
         @media (max-width: 560px) {
             body {
                 padding-inline: 12px;
@@ -446,8 +420,8 @@
             }
 
             .scanner-stage {
-                min-height: 280px;
-                aspect-ratio: 3 / 4;
+                min-height: 360px;
+                aspect-ratio: 3 / 4.6;
             }
 
             .scanner-controls {
@@ -516,7 +490,6 @@
                     <div class="scanner-stage">
                         <video id="scannerVideo" playsinline muted></video>
                         <canvas id="scanOverlay"></canvas>
-                        <div class="scan-line" aria-hidden="true"></div>
                     </div>
                     <div class="scanner-controls">
                         <span class="status-pill muted" id="scanStatus">Camera desligada</span>
@@ -525,9 +498,6 @@
                 </div>
 
                 <div class="result-card">
-                    <div class="result-header">
-                        <span class="result-badge" id="resultFormat">Nenhum codigo lido</span>
-                    </div>
                     <textarea id="scanText" readonly></textarea>
                     <div class="scan-actions">
                         <button class="btn-primary" id="copyButton" type="button" disabled>Copiar caracteres</button>
@@ -636,7 +606,6 @@
         const overlayContext = scanOverlay.getContext("2d");
         const stopCameraButton = document.getElementById("stopCameraButton");
         const scanStatus = document.getElementById("scanStatus");
-        const resultFormat = document.getElementById("resultFormat");
         const scanText = document.getElementById("scanText");
         const copyButton = document.getElementById("copyButton");
         const scanAgainButton = document.getElementById("scanAgainButton");
@@ -1118,7 +1087,6 @@
         }
 
         function clearScanResult() {
-            resultFormat.textContent = "Nenhum codigo lido";
             scanText.value = "";
             copyButton.disabled = true;
             clearOverlay();
@@ -1245,16 +1213,8 @@
         }
 
         function presentScanResult(result) {
-            const meta = result.meta || getFormatMeta(result.format);
-            resultFormat.textContent = meta.label;
             scanText.value = result.text || "";
             copyButton.disabled = !result.text;
-        }
-
-        function getFormatMeta(format) {
-            return FORMAT_META[format] || {
-                label: format || "Codigo detectado"
-            };
         }
 
         function setScanStatus(text, tone) {
