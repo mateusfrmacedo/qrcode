@@ -1,1250 +1,225 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>QR Code</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criar QR Code</title>
     <link rel="icon" type="image/webp" href="fav-icon.webp">
     <link rel="apple-touch-icon" href="fav-icon.webp">
-    <meta property="og:image" content="fav-icon.webp">
-    <meta property="og:title" content="QR Code">
-    <meta name="twitter:image" content="fav-icon.webp">
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.1/dist/iife/reader/index.js"></script>
     <style>
         :root {
             --bg-top: #f4f4f5;
             --bg-bottom: #d9dade;
-            --window-border: rgba(0, 0, 0, 0.12);
-            --title-top: #ececec;
-            --title-bottom: #d7d7d7;
-            --text-primary: #1d1d1f;
-            --text-secondary: #6e6e73;
-            --surface-soft: #f5f5f7;
-            --surface-muted: #f9f9fb;
+            --text: #1d1d1f;
+            --muted: #6e6e73;
             --stroke: #d2d2d7;
-            --stroke-strong: #b6b6bc;
-            --brand-top: #49a5ff;
-            --brand-bottom: #0071e3;
-            --brand-glow: rgba(0, 113, 227, 0.18);
-            --success: #2fa463;
-            --warning: #d97706;
-            --danger: #ff5f56;
+            --blue-top: #49a5ff;
+            --blue-bottom: #0071e3;
+            --blue-glow: rgba(0, 113, 227, .18);
         }
 
-        * {
-            box-sizing: border-box;
+        * { box-sizing: border-box; }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            padding: 28px 16px 36px;
+            display: grid;
+            place-items: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at top, rgba(255,255,255,.95), transparent 35%), linear-gradient(var(--bg-top), var(--bg-bottom));
             -webkit-font-smoothing: antialiased;
         }
 
-        body {
-            margin: 0;
-            min-height: 100vh;
-            padding: 28px 16px 36px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background:
-                radial-gradient(circle at top, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 35%),
-                linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
-            color: var(--text-primary);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
+        main { width: min(100%, 500px); }
 
-        .finder-window {
-            width: min(100%, 500px);
-            background-color: rgba(255, 255, 255, 0.92);
-            border-radius: 16px;
-            border: 0.5px solid var(--window-border);
-            box-shadow:
-                0 24px 80px rgba(0, 0, 0, 0.18),
-                0 6px 20px rgba(0, 0, 0, 0.08);
+        .window {
             overflow: hidden;
+            border: .5px solid rgba(0,0,0,.12);
+            border-radius: 16px;
+            background: rgba(255,255,255,.92);
+            box-shadow: 0 24px 80px rgba(0,0,0,.18), 0 6px 20px rgba(0,0,0,.08);
             backdrop-filter: blur(20px);
         }
 
         .title-bar {
-            background: linear-gradient(to bottom, var(--title-top), var(--title-bottom));
+            position: relative;
             height: 40px;
             display: flex;
             align-items: center;
             padding: 0 15px;
-            position: relative;
-            border-bottom: 0.5px solid var(--stroke-strong);
+            border-bottom: .5px solid #b6b6bc;
+            background: linear-gradient(#ececec, #d7d7d7);
         }
 
-        .traffic-lights {
-            display: flex;
-            gap: 8px;
-        }
+        .traffic-lights { display: flex; gap: 8px; }
+        .dot { width: 12px; height: 12px; border: .5px solid rgba(0,0,0,.14); border-radius: 50%; }
+        .red { background: #ff5f56; } .yellow { background: #ffbd2e; } .green { background: #27c93f; }
 
-        .dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            border: 0.5px solid rgba(0, 0, 0, 0.14);
-        }
-
-        .red { background-color: #ff5f56; }
-        .yellow { background-color: #ffbd2e; }
-        .green { background-color: #27c93f; }
-
-        .window-title {
-            position: absolute;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            pointer-events: none;
-            font-size: 13px;
-            font-weight: 600;
-            color: #5f5f65;
-        }
-
-        .content {
-            padding: 24px 22px 22px;
-        }
-
-        .segmented-control {
-            display: flex;
-            gap: 6px;
-            padding: 5px;
-            background: linear-gradient(180deg, #f4f4f6, #e6e6ea);
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            border-radius: 12px;
-            margin-bottom: 22px;
-        }
-
-        .segment {
-            flex: 1;
-            border: none;
-            border-radius: 9px;
-            padding: 10px 12px;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            background: transparent;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .segment.active {
-            color: var(--text-primary);
-            background: linear-gradient(180deg, #ffffff, #f5f5f7);
-            box-shadow:
-                inset 0 0 0 0.5px rgba(255, 255, 255, 0.8),
-                0 1px 2px rgba(0, 0, 0, 0.08);
-        }
-
-        .panel {
-            display: none;
-            animation: fadeIn 0.24s ease;
-        }
-
-        .panel.active {
-            display: block;
-        }
-
-        h1 {
-            margin: 0 0 8px;
-            font-size: 24px;
-            letter-spacing: -0.6px;
-        }
-
-        p {
-            margin: 0 0 18px;
-            font-size: 14px;
-            line-height: 1.55;
-            color: var(--text-secondary);
-        }
+        .content { padding: 24px 22px 22px; }
+        h1 { margin: 0 0 18px; font-size: 24px; letter-spacing: -.6px; }
 
         textarea {
-            width: 100%;
-            min-height: 96px;
-            padding: 14px;
-            font-size: 15px;
-            line-height: 1.5;
-            font-family: inherit;
-            resize: vertical;
-            border-radius: 12px;
-            border: 1px solid var(--stroke);
-            background: var(--surface-muted);
-            color: var(--text-primary);
-            outline: none;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-            margin-bottom: 14px;
+            width: 100%; min-height: 104px; margin-bottom: 14px; padding: 14px;
+            resize: vertical; border: 1px solid var(--stroke); border-radius: 12px;
+            outline: none; background: #f9f9fb; color: var(--text); font: 15px/1.5 inherit;
+            transition: border-color .2s, box-shadow .2s;
+        }
+        textarea:focus { border-color: var(--blue-bottom); box-shadow: 0 0 0 4px var(--blue-glow); }
+        textarea.invalid { border-color: #ff5f56; }
+
+        button { font: inherit; cursor: pointer; transition: transform .15s, box-shadow .2s, opacity .2s; }
+        button:hover { transform: translateY(-1px); }
+        button:active { transform: none; }
+
+        .primary {
+            width: 100%; padding: 12px 14px; border: 0; border-radius: 10px;
+            color: #fff; font-size: 15px; font-weight: 600;
+            background: linear-gradient(var(--blue-top), var(--blue-bottom));
+            box-shadow: 0 10px 24px rgba(0,113,227,.18);
         }
 
-        textarea:focus {
-            border-color: var(--brand-bottom);
-            box-shadow: 0 0 0 4px var(--brand-glow);
+        .result { margin-top: 22px; }
+        .qr-preview { display: none; justify-content: center; margin-bottom: 18px; }
+        .qr-preview.visible { display: flex; }
+        #qrcode { width: 212px; height: 212px; padding: 12px; border: 1px solid #ececef; border-radius: 14px; background: #fff; }
+        #qrcode canvas, #qrcode img { display: block; width: 100% !important; height: auto !important; }
+        #qrcode.sticker-drop { animation: sticker-drop .56s cubic-bezier(.2, .85, .25, 1.2); }
+
+        .export { display: flex; flex-direction: column; align-items: center; margin-top: 18px; padding-top: 4px; }
+        .export.hidden { display: none; }
+        .format-label { display: block; margin-bottom: 12px; color: #94949b; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+        .format-buttons { display: flex; width: max-content; max-width: 100%; gap: 10px; }
+        .download {
+            flex: 0 1 104px; padding: 10px 12px; border: 1px solid var(--stroke); border-radius: 10px;
+            color: var(--text); font-size: 13px; font-weight: 700;
+            background: linear-gradient(#fff, #f3f3f6); box-shadow: 0 2px 8px rgba(0,0,0,.05);
         }
+        .download:disabled { opacity: .48; cursor: not-allowed; transform: none; }
+        .status { min-height: 18px; margin: 10px 0 0; color: #b42318; font-size: 12px; line-height: 1.5; text-align: center; }
 
-        textarea[readonly] {
-            background: #fcfcfd;
+        footer { margin-top: 24px; color: var(--muted); font-size: 12px; text-align: center; }
+        footer a { color: var(--blue-bottom); text-decoration: none; }
+        @keyframes sticker-drop {
+            0% { opacity: 0; transform: translateY(-28px) rotate(-5deg) scale(.82); }
+            62% { opacity: 1; transform: translateY(4px) rotate(1.4deg) scale(1.025); }
+            100% { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
         }
-
-        .btn-primary,
-        .btn-secondary,
-        .btn-download {
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease, opacity 0.2s ease;
-            font-family: inherit;
-        }
-
-        .btn-primary,
-        .btn-secondary {
-            width: 100%;
-            padding: 12px 14px;
-            font-size: 15px;
-            font-weight: 600;
-        }
-
-        .btn-primary {
-            color: #ffffff;
-            background: linear-gradient(180deg, var(--brand-top), var(--brand-bottom));
-            box-shadow: 0 10px 24px rgba(0, 113, 227, 0.18);
-        }
-
-        .btn-secondary,
-        .btn-download {
-            color: var(--text-primary);
-            background: linear-gradient(180deg, #ffffff, #f3f3f6);
-            border: 1px solid var(--stroke);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        }
-
-        .btn-primary:hover,
-        .btn-secondary:hover,
-        .btn-download:hover {
-            transform: translateY(-1px);
-        }
-
-        .btn-primary:active,
-        .btn-secondary:active,
-        .btn-download:active {
-            transform: translateY(0);
-        }
-
-        .btn-primary:disabled,
-        .btn-secondary:disabled,
-        .btn-download:disabled {
-            opacity: 0.55;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        #qrcode-container {
-            margin: 22px 0 0;
-            display: none;
-            justify-content: center;
-        }
-
-        #qrcode {
-            width: 188px;
-            height: 188px;
-            padding: 12px;
-            border-radius: 14px;
-            background: #ffffff;
-            border: 1px solid #ececef;
-            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
-        }
-
-        #qrcode canvas,
-        #qrcode img {
-            max-width: 100% !important;
-            height: auto !important;
-        }
-
-        .download-area,
-        .result-card,
-        .scanner-frame {
-            margin-top: 18px;
-            padding: 16px;
-            border-radius: 14px;
-            background: rgba(245, 245, 247, 0.74);
-            border: 1px solid rgba(210, 210, 215, 0.9);
-        }
-
-        .download-area {
-            display: none;
-        }
-
-        .format-label {
-            display: block;
-            margin-bottom: 12px;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: #94949b;
-        }
-
-        .format-selector,
-        .scan-actions,
-        .scanner-controls,
-        .result-header {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .format-selector .btn-download,
-        .scan-actions > * {
-            flex: 1 1 140px;
-        }
-
-        #scanPanel {
-            margin-inline: -4px;
-        }
-
-        .btn-download {
-            padding: 10px 12px;
-            font-size: 13px;
-            font-weight: 700;
-        }
-
-        .scanner-stage {
-            position: relative;
-            overflow: hidden;
-            border-radius: 14px;
-            background:
-                linear-gradient(180deg, rgba(18, 18, 20, 0.92), rgba(35, 35, 38, 0.92));
-            aspect-ratio: 16 / 10;
-            min-height: 320px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .scanner-stage::after {
-            content: "";
-            position: absolute;
-            inset: 14% 10%;
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.16);
-            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-            pointer-events: none;
-        }
-
-        #scannerVideo,
-        #scanOverlay {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
-        #scannerVideo {
-            object-fit: cover;
-        }
-
-        #scanOverlay {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-        }
-
-        .scanner-controls {
-            margin-top: 14px;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 7px 12px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.01em;
-            background: #ffffff;
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            color: var(--text-primary);
-        }
-
-        .status-pill.info { color: var(--brand-bottom); }
-        .status-pill.success { color: var(--success); }
-        .status-pill.warning { color: var(--warning); }
-        .status-pill.muted { color: var(--text-secondary); }
-
-        .result-card textarea {
-            min-height: 118px;
-            margin-top: 0;
-            margin-bottom: 14px;
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        footer {
-            margin-top: 24px;
-            font-size: 12px;
-            color: var(--text-secondary);
-            text-align: center;
-        }
-
-        footer a {
-            color: var(--brand-bottom);
-            text-decoration: none;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(6px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @media (max-width: 560px) {
-            body {
-                padding-inline: 12px;
-            }
-
-            .content {
-                padding: 20px 18px 18px;
-            }
-
-            h1 {
-                font-size: 22px;
-            }
-
-            .scanner-stage {
-                min-height: 360px;
-                aspect-ratio: 3 / 4.6;
-            }
-
-            .scanner-controls {
-                align-items: stretch;
-            }
-
-            .status-pill,
-            .scanner-controls .btn-secondary {
-                width: 100%;
-                justify-content: center;
-            }
-
-            .scan-actions > * {
-                flex-basis: 100%;
-            }
-        }
+        @media (max-width: 560px) { .content { padding: 20px 18px 18px; } h1 { font-size: 22px; } }
     </style>
 </head>
 <body>
+    <main>
+        <section class="window" aria-labelledby="page-title">
+            <header class="title-bar">
+                <div class="traffic-lights" aria-hidden="true"><i class="dot red"></i><i class="dot yellow"></i><i class="dot green"></i></div>
+            </header>
+            <div class="content">
+                <h1 id="page-title">Gerar QR Code</h1>
+                <textarea id="contentInput" placeholder="Cole ou digite o conteúdo aqui" aria-label="Conteúdo do QR Code"></textarea>
+                <button class="primary" id="generateButton" type="button">Gerar QR Code</button>
 
-    <div class="finder-window">
-        <div class="title-bar">
-            <div class="traffic-lights">
-                <div class="dot red"></div>
-                <div class="dot yellow"></div>
-                <div class="dot green"></div>
+                <div class="result" id="result">
+                    <div class="qr-preview" id="qrPreview"><div id="qrcode" aria-label="Prévia do QR Code"></div></div>
+                    <div class="export hidden" id="exportArea">
+                        <span class="format-label">Baixar imagem</span>
+                        <div class="format-buttons">
+                            <button class="download" type="button" data-format="png" disabled>PNG</button>
+                            <button class="download" type="button" data-format="jpeg" disabled>JPG</button>
+                            <button class="download" type="button" data-format="svg" disabled>SVG</button>
+                        </div>
+                        <p class="status" id="status" role="status" aria-live="polite"></p>
+                    </div>
+                </div>
             </div>
-            <div class="window-title"></div>
-        </div>
-
-        <div class="content">
-            <div class="segmented-control" role="tablist" aria-label="Ferramentas">
-                <button class="segment active" type="button" data-view="create">Criar</button>
-                <button class="segment" type="button" data-view="scan">Ler codigos</button>
-            </div>
-
-            <section class="panel active" id="createPanel">
-                <h1>Gerar QR Code</h1>
-
-                <textarea id="linkInput"></textarea>
-                <button class="btn-primary" id="generateButton" type="button">Gerar QR Code</button>
-
-                <div id="qrcode-container">
-                    <div id="qrcode"></div>
-                </div>
-
-                <div id="downloadArea" class="download-area">
-                    <span class="format-label">Exportar Alta Definicao</span>
-                    <div class="format-selector">
-                        <button class="btn-download" type="button" data-download="png">PNG</button>
-                        <button class="btn-download" type="button" data-download="jpeg">JPG</button>
-                        <button class="btn-download" type="button" data-download="svg">SVG</button>
-                    </div>
-                </div>
-
-            </section>
-
-            <section class="panel" id="scanPanel">
-                <h1>Ler codigo</h1>
-
-                <div class="scan-actions">
-                    <button class="btn-primary" id="cameraButton" type="button">Abrir camera</button>
-                </div>
-
-                <div class="scanner-frame hidden" id="scannerFrame">
-                    <div class="scanner-stage">
-                        <video id="scannerVideo" playsinline muted></video>
-                        <canvas id="scanOverlay"></canvas>
-                    </div>
-                    <div class="scanner-controls">
-                        <span class="status-pill muted" id="scanStatus">Camera desligada</span>
-                        <button class="btn-secondary" id="stopCameraButton" type="button">Parar camera</button>
-                    </div>
-                </div>
-
-                <div class="result-card">
-                    <textarea id="scanText" readonly></textarea>
-                    <div class="scan-actions">
-                        <button class="btn-primary" id="copyButton" type="button" disabled>Copiar caracteres</button>
-                        <button class="btn-secondary" id="scanAgainButton" type="button">Escanear novamente</button>
-                    </div>
-                </div>
-            </section>
-        </div>
-    </div>
-
-    <footer>
-        Created by <a href="https://mateusfrmacedo.github.io/" target="_blank" rel="noreferrer">Mateus</a>
-    </footer>
+        </section>
+        <footer>Created by <a href="https://mateusfrmacedo.github.io/" target="_blank" rel="noreferrer">Mateus</a></footer>
+    </main>
 
     <script>
-        const CONSENSUS_TARGET = 2;
+        const input = document.getElementById("contentInput");
+        const qrElement = document.getElementById("qrcode");
+        const preview = document.getElementById("qrPreview");
+        const exportArea = document.getElementById("exportArea");
+        const status = document.getElementById("status");
+        const downloadButtons = document.querySelectorAll("[data-format]");
 
-        const BOLETO_READER_OPTIONS = {
-            formats: ["ITF"],
-            maxNumberOfSymbols: 6,
-            tryHarder: true,
-            tryRotate: true,
-            tryInvert: true,
-            tryDownscale: true,
-            validateOptionalChecksum: true,
-            minLineCount: 4,
-            textMode: "Plain"
-        };
-
-        const BOLETO_OPTION_VARIANTS = [
-            {
-                ...BOLETO_READER_OPTIONS,
-                binarizer: "GlobalHistogram",
-                minLineCount: 5,
-                downscaleFactor: 2,
-                downscaleThreshold: 960
-            },
-            {
-                ...BOLETO_READER_OPTIONS,
-                binarizer: "LocalAverage",
-                minLineCount: 4,
-                downscaleFactor: 2,
-                downscaleThreshold: 960
-            },
-            {
-                ...BOLETO_READER_OPTIONS,
-                binarizer: "FixedThreshold",
-                minLineCount: 6,
-                tryDownscale: false
-            }
-        ];
-
-        const state = {
-            activeView: "create",
-            stream: null,
-            cameraLoop: null,
-            isScanning: false,
-            wasmReadyPromise: null,
-            stableCode: "",
-            stableHits: 0,
-            lastValidAt: 0
-        };
-
-        const segmentButtons = document.querySelectorAll(".segment");
-        const createPanel = document.getElementById("createPanel");
-        const scanPanel = document.getElementById("scanPanel");
-
-        const linkInput = document.getElementById("linkInput");
-        const generateButton = document.getElementById("generateButton");
-        const qrContainer = document.getElementById("qrcode-container");
-        const qrDiv = document.getElementById("qrcode");
-        const downloadArea = document.getElementById("downloadArea");
-
-        const cameraButton = document.getElementById("cameraButton");
-        const scannerFrame = document.getElementById("scannerFrame");
-        const scannerVideo = document.getElementById("scannerVideo");
-        const scanOverlay = document.getElementById("scanOverlay");
-        const overlayContext = scanOverlay.getContext("2d");
-        const stopCameraButton = document.getElementById("stopCameraButton");
-        const scanStatus = document.getElementById("scanStatus");
-        const scanText = document.getElementById("scanText");
-        const copyButton = document.getElementById("copyButton");
-        const scanAgainButton = document.getElementById("scanAgainButton");
-
-        const captureCanvas = document.createElement("canvas");
-        const captureContext = captureCanvas.getContext("2d", { willReadFrequently: true });
-
-        segmentButtons.forEach((button) => {
-            button.addEventListener("click", () => setActiveView(button.dataset.view));
+        document.getElementById("generateButton").addEventListener("click", generateQrCode);
+        input.addEventListener("keydown", (event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") generateQrCode();
+        });
+        downloadButtons.forEach((button) => {
+            button.addEventListener("click", () => downloadQrCode(button.dataset.format));
         });
 
-        generateButton.addEventListener("click", gerarQR);
-        linkInput.addEventListener("keydown", (event) => {
-            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                gerarQR();
-            }
-        });
-
-        document.querySelectorAll("[data-download]").forEach((button) => {
-            button.addEventListener("click", () => baixar(button.dataset.download));
-        });
-
-        cameraButton.addEventListener("click", startCamera);
-        stopCameraButton.addEventListener("click", () => {
-            stopCamera({ hideFrame: true });
-            setScanStatus("Camera desligada", "muted");
-        });
-        copyButton.addEventListener("click", copyScanText);
-        scanAgainButton.addEventListener("click", async () => {
-            setActiveView("scan");
-            await startCamera();
-        });
-
-        window.addEventListener("beforeunload", stopCamera);
-        document.addEventListener("visibilitychange", () => {
-            if (document.hidden) {
-                stopCamera({ hideFrame: true });
-            }
-        });
-
-        setScanStatus("Camera desligada", "muted");
-        warmScanner();
-
-        function setActiveView(view) {
-            state.activeView = view;
-            segmentButtons.forEach((button) => {
-                button.classList.toggle("active", button.dataset.view === view);
-            });
-            createPanel.classList.toggle("active", view === "create");
-            scanPanel.classList.toggle("active", view === "scan");
-
-            if (view !== "scan") {
-                stopCamera({ hideFrame: true });
-            }
-        }
-
-        function gerarQR() {
-            const text = linkInput.value.trim();
-
+        function generateQrCode() {
+            const text = input.value.trim();
             if (!text) {
-                linkInput.style.borderColor = "var(--danger)";
-                setTimeout(() => {
-                    linkInput.style.borderColor = "var(--stroke)";
-                }, 1800);
+                input.classList.add("invalid");
+                input.focus();
+                window.setTimeout(() => input.classList.remove("invalid"), 1600);
                 return;
             }
 
-            qrDiv.innerHTML = "";
-            qrContainer.style.display = "flex";
-
-            new QRCode(qrDiv, {
-                text: text,
-                width: 1000,
-                height: 1000,
-                colorDark: "#000000",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.L
-            });
-
-            setTimeout(() => {
-                downloadArea.style.display = "block";
-            }, 220);
+            try {
+                qrElement.replaceChildren();
+                new QRCode(qrElement, {
+                    text,
+                    typeNumber: 0,
+                    width: 1000,
+                    height: 1000,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.L
+                });
+                preview.classList.add("visible");
+                qrElement.classList.remove("sticker-drop");
+                void qrElement.offsetWidth;
+                qrElement.classList.add("sticker-drop");
+                exportArea.classList.remove("hidden");
+                downloadButtons.forEach((button) => { button.disabled = false; });
+                status.textContent = "";
+            } catch (error) {
+                qrElement.replaceChildren();
+                preview.classList.remove("visible");
+                exportArea.classList.add("hidden");
+                downloadButtons.forEach((button) => { button.disabled = true; });
+                status.textContent = "O conteúdo é grande demais para um QR Code. Reduza o texto e tente novamente.";
+            }
         }
 
-        function baixar(formato) {
-            const canvas = document.querySelector("#qrcode canvas");
-            if (!canvas) {
+        function downloadQrCode(format) {
+            const canvas = qrElement.querySelector("canvas");
+            if (!canvas) return;
+            const name = `qrcode_${Date.now()}`;
+
+            if (format === "svg") {
+                const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000"><rect width="100%" height="100%" fill="#fff"/><image width="1000" height="1000" href="${canvas.toDataURL("image/png")}"/></svg>`;
+                save(URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" })), `${name}.svg`);
                 return;
             }
 
-            const fileName = `qrcode_${Date.now()}`;
-
-            if (formato === "svg") {
-                const svgData = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000"><rect width="100%" height="100%" fill="white"/><image width="1000" height="1000" href="${canvas.toDataURL("image/png")}"/></svg>`;
-                const blob = new Blob([svgData], { type: "image/svg+xml" });
-                fazerDownload(URL.createObjectURL(blob), `${fileName}.svg`);
-                return;
-            }
-
-            let dataUrl;
-            if (formato === "jpeg") {
-                const tempCanvas = document.createElement("canvas");
-                tempCanvas.width = 1000;
-                tempCanvas.height = 1000;
-                const context = tempCanvas.getContext("2d");
-                context.fillStyle = "#FFFFFF";
+            if (format === "jpeg") {
+                const jpegCanvas = document.createElement("canvas");
+                jpegCanvas.width = jpegCanvas.height = 1000;
+                const context = jpegCanvas.getContext("2d");
+                context.fillStyle = "#fff";
                 context.fillRect(0, 0, 1000, 1000);
                 context.drawImage(canvas, 0, 0);
-                dataUrl = tempCanvas.toDataURL("image/jpeg", 1.0);
-            } else {
-                dataUrl = canvas.toDataURL("image/png");
+                save(jpegCanvas.toDataURL("image/jpeg", 1), `${name}.jpeg`);
+                return;
             }
-
-            fazerDownload(dataUrl, `${fileName}.${formato}`);
+            save(canvas.toDataURL("image/png"), `${name}.png`);
         }
 
-        function fazerDownload(url, name) {
+        function save(url, filename) {
             const link = document.createElement("a");
             link.href = url;
-            link.download = name;
+            link.download = filename;
             link.click();
-        }
-
-        async function warmScanner() {
-            try {
-                await ensureScannerReady();
-            } catch (error) {
-                console.error(error);
-                setScanStatus("Leitor indisponivel no momento", "warning");
-            }
-        }
-
-        async function ensureScannerReady() {
-            if (!window.ZXingWASM || typeof window.ZXingWASM.readBarcodes !== "function") {
-                throw new Error("ZXingWASM nao foi carregado.");
-            }
-
-            if (!state.wasmReadyPromise) {
-                if (typeof window.ZXingWASM.prepareZXingModule === "function") {
-                    state.wasmReadyPromise = window.ZXingWASM.prepareZXingModule({
-                        fireImmediately: true
-                    });
-                } else {
-                    state.wasmReadyPromise = Promise.resolve();
-                }
-            }
-
-            return state.wasmReadyPromise;
-        }
-
-        async function decodeBestResultFromImageData(imageData) {
-            return decodeBoletoFromImageData(imageData);
-        }
-
-        async function decodeBoletoFromImageData(imageData) {
-            const variants = createBoletoVariants(imageData);
-            let invalidCandidate = null;
-
-            for (const [variantIndex, variant] of variants.entries()) {
-                for (const [optionIndex, readerOptions] of BOLETO_OPTION_VARIANTS.entries()) {
-                    let results = [];
-
-                    try {
-                        results = await window.ZXingWASM.readBarcodes(variant.imageData, readerOptions);
-                    } catch (error) {
-                        console.error(error);
-                        continue;
-                    }
-
-                    for (const result of results) {
-                        const candidate = createBoletoCandidate(result, variantIndex, optionIndex);
-                        if (!candidate) {
-                            continue;
-                        }
-
-                        if (candidate.valid) {
-                            return {
-                                type: "boleto",
-                                valid: true,
-                                text: candidate.text
-                            };
-                        }
-
-                        if (!invalidCandidate || candidate.score > invalidCandidate.score) {
-                            invalidCandidate = candidate;
-                        }
-                    }
-                }
-            }
-
-            if (!invalidCandidate) {
-                return null;
-            }
-
-            return {
-                type: "boleto",
-                valid: false,
-                invalidCandidate
-            };
-        }
-
-        function createBoletoCandidate(result, variantIndex, optionIndex) {
-            const digits = onlyDigits(result.text);
-            if (!digits || digits.length < 43) {
-                return null;
-            }
-
-            const resolved = resolveValidBoletoDigits(digits);
-            const isValid = Boolean(resolved);
-            const normalizedDigits = resolved || digits;
-            const isLikelyBoleto = normalizedDigits.length >= 43 && normalizedDigits.length <= 48;
-            const score =
-                isValid ? 100 - (variantIndex * 5) - optionIndex :
-                normalizedDigits.length === 44 ? 40 - variantIndex :
-                isLikelyBoleto ? 15 :
-                0;
-
-            return {
-                valid: isValid,
-                score,
-                text: normalizedDigits
-            };
-        }
-
-        function createBoletoVariants(imageData) {
-            return [
-                {
-                    name: "lower-band-wide",
-                    imageData: transformImageData(imageData, {
-                        cropTopRatio: 0.55,
-                        cropBottomRatio: 0.93,
-                        cropLeftRatio: 0.03,
-                        cropRightRatio: 0.97,
-                        scaleX: 2.2,
-                        scaleY: 2.8,
-                        contrast: 1.25
-                    })
-                },
-                {
-                    name: "lower-band-binary",
-                    imageData: transformImageData(imageData, {
-                        cropTopRatio: 0.6,
-                        cropBottomRatio: 0.92,
-                        cropLeftRatio: 0.02,
-                        cropRightRatio: 0.98,
-                        scaleX: 2.5,
-                        scaleY: 3,
-                        contrast: 1.45,
-                        binaryThreshold: 160
-                    })
-                },
-                {
-                    name: "lower-band-tight",
-                    imageData: transformImageData(imageData, {
-                        cropTopRatio: 0.66,
-                        cropBottomRatio: 0.94,
-                        cropLeftRatio: 0.02,
-                        cropRightRatio: 0.98,
-                        scaleX: 3,
-                        scaleY: 3.4,
-                        contrast: 1.55,
-                        binaryThreshold: 150
-                    })
-                },
-                {
-                    name: "full-frame",
-                    imageData: transformImageData(imageData, {
-                        scaleX: 1.4,
-                        scaleY: 1.4,
-                        contrast: 1.15
-                    })
-                }
-            ];
-        }
-
-        function transformImageData(sourceImageData, options = {}) {
-            const {
-                cropTopRatio = 0,
-                cropBottomRatio = 1,
-                cropLeftRatio = 0,
-                cropRightRatio = 1,
-                scaleX = 1,
-                scaleY = 1,
-                contrast = 1,
-                binaryThreshold = null
-            } = options;
-
-            const sourceCanvas = document.createElement("canvas");
-            sourceCanvas.width = sourceImageData.width;
-            sourceCanvas.height = sourceImageData.height;
-            sourceCanvas.getContext("2d").putImageData(sourceImageData, 0, 0);
-
-            const sourceWidth = sourceImageData.width;
-            const sourceHeight = sourceImageData.height;
-            const sx = Math.max(0, Math.min(sourceWidth - 1, Math.floor(sourceWidth * cropLeftRatio)));
-            const sy = Math.max(0, Math.min(sourceHeight - 1, Math.floor(sourceHeight * cropTopRatio)));
-            const sw = Math.max(1, Math.floor(sourceWidth * cropRightRatio) - sx);
-            const sh = Math.max(1, Math.floor(sourceHeight * cropBottomRatio) - sy);
-            const targetWidth = Math.max(1, Math.round(sw * scaleX));
-            const targetHeight = Math.max(1, Math.round(sh * scaleY));
-
-            const targetCanvas = document.createElement("canvas");
-            targetCanvas.width = targetWidth;
-            targetCanvas.height = targetHeight;
-            const targetContext = targetCanvas.getContext("2d", { willReadFrequently: true });
-            targetContext.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
-
-            let variantImageData = targetContext.getImageData(0, 0, targetWidth, targetHeight);
-
-            if (contrast !== 1 || binaryThreshold !== null) {
-                const pixels = variantImageData.data;
-                for (let index = 0; index < pixels.length; index += 4) {
-                    const luminance = (pixels[index] * 0.299) + (pixels[index + 1] * 0.587) + (pixels[index + 2] * 0.114);
-                    const contrasted = Math.max(0, Math.min(255, ((luminance - 128) * contrast) + 128));
-                    const value = binaryThreshold !== null ? (contrasted >= binaryThreshold ? 255 : 0) : contrasted;
-                    pixels[index] = value;
-                    pixels[index + 1] = value;
-                    pixels[index + 2] = value;
-                    pixels[index + 3] = 255;
-                }
-                targetContext.putImageData(variantImageData, 0, 0);
-                variantImageData = targetContext.getImageData(0, 0, targetWidth, targetHeight);
-            }
-
-            return variantImageData;
-        }
-
-        function onlyDigits(value) {
-            return String(value || "").replace(/\D/g, "");
-        }
-
-        function resolveValidBoletoDigits(rawDigits) {
-            if (isValidBoletoDigits(rawDigits)) {
-                return rawDigits;
-            }
-
-            if (rawDigits.length > 44 && rawDigits.length <= 48) {
-                for (let index = 0; index <= rawDigits.length - 44; index += 1) {
-                    const slice = rawDigits.slice(index, index + 44);
-                    if (isValidBoletoDigits(slice)) {
-                        return slice;
-                    }
-                }
-            }
-
-            return "";
-        }
-
-        function isValidBoletoDigits(code) {
-            return isValidBankBoletoBarcode(code) || isValidArrecadacaoBarcode(code);
-        }
-
-        function isValidBankBoletoBarcode(code) {
-            if (!/^\d{44}$/.test(code)) {
-                return false;
-            }
-
-            const dv = Number(code[4]);
-            const body = code.slice(0, 4) + code.slice(5);
-            return dv === calculateBankBoletoDV(body);
-        }
-
-        function calculateBankBoletoDV(body) {
-            let sum = 0;
-            let weight = 2;
-
-            for (let index = body.length - 1; index >= 0; index -= 1) {
-                sum += Number(body[index]) * weight;
-                weight = weight === 9 ? 2 : weight + 1;
-            }
-
-            const remainder = sum % 11;
-            const dv = 11 - remainder;
-
-            if (dv === 0 || dv === 10 || dv === 11) {
-                return 1;
-            }
-
-            return dv;
-        }
-
-        function isValidArrecadacaoBarcode(code) {
-            if (!/^\d{44}$/.test(code) || code[0] !== "8") {
-                return false;
-            }
-
-            const reference = code[2];
-            const dv = Number(code[3]);
-            const body = code.slice(0, 3) + code.slice(4);
-            let expected = null;
-
-            if (reference === "6" || reference === "7") {
-                expected = calculateModulo10DV(body);
-            } else if (reference === "8" || reference === "9") {
-                expected = calculateArrecadacaoModulo11DV(body);
-            }
-
-            return expected !== null && dv === expected;
-        }
-
-        function calculateModulo10DV(body) {
-            let sum = 0;
-            let weight = 2;
-
-            for (let index = body.length - 1; index >= 0; index -= 1) {
-                const product = Number(body[index]) * weight;
-                sum += product > 9 ? Math.floor(product / 10) + (product % 10) : product;
-                weight = weight === 2 ? 1 : 2;
-            }
-
-            const remainder = sum % 10;
-            return remainder === 0 ? 0 : 10 - remainder;
-        }
-
-        function calculateArrecadacaoModulo11DV(body) {
-            let sum = 0;
-            let weight = 2;
-
-            for (let index = body.length - 1; index >= 0; index -= 1) {
-                sum += Number(body[index]) * weight;
-                weight = weight === 9 ? 2 : weight + 1;
-            }
-
-            const remainder = sum % 11;
-            const dv = 11 - remainder;
-
-            if (dv === 0 || dv === 1) {
-                return 0;
-            }
-
-            if (dv === 10 || dv === 11) {
-                return 1;
-            }
-
-            return dv;
-        }
-
-        function clearScanResult() {
-            scanText.value = "";
-            copyButton.disabled = true;
-            clearOverlay();
-        }
-
-        function resetConsensus() {
-            state.stableCode = "";
-            state.stableHits = 0;
-            state.lastValidAt = 0;
-        }
-
-        function registerStableRead(code) {
-            const now = Date.now();
-
-            if (state.stableCode === code && (now - state.lastValidAt) <= 1500) {
-                state.stableHits += 1;
-            } else {
-                state.stableCode = code;
-                state.stableHits = 1;
-            }
-
-            state.lastValidAt = now;
-            return state.stableHits >= CONSENSUS_TARGET;
-        }
-
-        async function configureCameraTrack(track) {
-            if (!track || typeof track.applyConstraints !== "function") {
-                return;
-            }
-
-            const capabilities = typeof track.getCapabilities === "function" ? track.getCapabilities() : {};
-            const advanced = [];
-
-            if (Array.isArray(capabilities.focusMode) && capabilities.focusMode.includes("continuous")) {
-                advanced.push({ focusMode: "continuous" });
-            }
-
-            if (Array.isArray(capabilities.exposureMode) && capabilities.exposureMode.includes("continuous")) {
-                advanced.push({ exposureMode: "continuous" });
-            }
-
-            if (Array.isArray(capabilities.whiteBalanceMode) && capabilities.whiteBalanceMode.includes("continuous")) {
-                advanced.push({ whiteBalanceMode: "continuous" });
-            }
-
-            try {
-                if (advanced.length > 0) {
-                    await track.applyConstraints({ advanced });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
-
-        async function startCamera() {
-            setActiveView("scan");
-
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                stopCamera({ hideFrame: true });
-                setScanStatus("Seu navegador nao liberou acesso a camera", "warning");
-                return;
-            }
-
-            try {
-                await ensureScannerReady();
-                stopCamera({ hideFrame: true });
-
-                setScanStatus("Abrindo camera...", "info");
-                scannerFrame.classList.remove("hidden");
-                scannerFrame.classList.add("scanning");
-
-                state.stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: { ideal: "environment" },
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                        aspectRatio: { ideal: 1.77 }
-                    },
-                    audio: false
-                });
-
-                scannerVideo.srcObject = state.stream;
-                await configureCameraTrack(state.stream.getVideoTracks()[0]);
-                await scannerVideo.play();
-
-                resetConsensus();
-                clearOverlay();
-                clearScanResult();
-                setScanStatus("Aponte para o codigo de barras do boleto", "info");
-                queueCameraScan();
-            } catch (error) {
-                console.error(error);
-                stopCamera({ hideFrame: true });
-                setScanStatus("Nao foi possivel iniciar a camera. Em iPhone e Safari, use HTTPS.", "warning");
-            }
-        }
-
-        function stopCamera(options = {}) {
-            const { hideFrame = false } = options;
-
-            if (state.cameraLoop) {
-                clearTimeout(state.cameraLoop);
-                state.cameraLoop = null;
-            }
-
-            state.isScanning = false;
-            clearOverlay();
-            resetConsensus();
-
-            if (state.stream) {
-                state.stream.getTracks().forEach((track) => track.stop());
-                state.stream = null;
-            }
-
-            if (scannerVideo.srcObject) {
-                scannerVideo.srcObject = null;
-            }
-
-            scannerFrame.classList.remove("scanning");
-
-            if (hideFrame) {
-                scannerFrame.classList.add("hidden");
-            }
-        }
-
-        function queueCameraScan() {
-            if (!state.stream) {
-                return;
-            }
-
-            state.cameraLoop = window.setTimeout(scanCameraFrame, 160);
-        }
-
-        async function scanCameraFrame() {
-            if (!state.stream || state.isScanning) {
-                queueCameraScan();
-                return;
-            }
-
-            if (scannerVideo.readyState < 2 || !scannerVideo.videoWidth || !scannerVideo.videoHeight) {
-                queueCameraScan();
-                return;
-            }
-
-            state.isScanning = true;
-
-            try {
-                const imageData = captureCurrentFrame();
-                const decoded = await decodeBestResultFromImageData(imageData);
-
-                if (decoded && decoded.valid) {
-                    if (registerStableRead(decoded.text)) {
-                        clearOverlay();
-                        presentScanResult(decoded);
-                        setScanStatus("Codigo identificado pela camera", "success");
-                        stopCamera({ hideFrame: true });
-                        return;
-                    }
-
-                    setScanStatus("Confirmando leitura...", "info");
-                } else if (decoded && decoded.invalidCandidate && decoded.invalidCandidate.score >= 35) {
-                    setScanStatus("Ajuste distancia e alinhamento do boleto", "warning");
-                }
-            } catch (error) {
-                console.error(error);
-            } finally {
-                state.isScanning = false;
-            }
-
-            queueCameraScan();
-        }
-
-        function captureCurrentFrame() {
-            const maxWidth = 1920;
-            const scale = Math.min(1, maxWidth / scannerVideo.videoWidth);
-            const width = Math.max(1, Math.round(scannerVideo.videoWidth * scale));
-            const height = Math.max(1, Math.round(scannerVideo.videoHeight * scale));
-
-            captureCanvas.width = width;
-            captureCanvas.height = height;
-            captureContext.drawImage(scannerVideo, 0, 0, width, height);
-            return captureContext.getImageData(0, 0, width, height);
-        }
-
-        function presentScanResult(result) {
-            scanText.value = result.text || "";
-            copyButton.disabled = !result.text;
-        }
-
-        function setScanStatus(text, tone) {
-            scanStatus.textContent = text;
-            scanStatus.className = `status-pill ${tone}`;
-        }
-
-        function clearOverlay() {
-            const width = scanOverlay.width || scanOverlay.clientWidth || 0;
-            const height = scanOverlay.height || scanOverlay.clientHeight || 0;
-            overlayContext.clearRect(0, 0, width, height);
-        }
-
-        function drawOverlay(position, sourceWidth, sourceHeight) {
-            clearOverlay();
-        }
-
-        async function copyScanText() {
-            if (!scanText.value) {
-                return;
-            }
-
-            try {
-                await navigator.clipboard.writeText(scanText.value);
-                flashCopySuccess();
-            } catch (error) {
-                scanText.focus();
-                scanText.select();
-                document.execCommand("copy");
-                flashCopySuccess();
-            }
-        }
-
-        function flashCopySuccess() {
-            const original = copyButton.textContent;
-            copyButton.textContent = "Copiado!";
-            copyButton.disabled = true;
-
-            window.setTimeout(() => {
-                copyButton.textContent = original;
-                copyButton.disabled = !scanText.value;
-            }, 1400);
+            if (url.startsWith("blob:")) window.setTimeout(() => URL.revokeObjectURL(url), 0);
         }
     </script>
 </body>
